@@ -4,59 +4,54 @@ from scrapers.common import BASE_URL, Cache, fetch_page
 
 _map_cache = Cache()
 
+ATLAS_URL = "https://poedb.tw/us/Atlas_of_Worlds"
+
 
 def _get_all_maps() -> list[dict]:
-    """Scrape /us/Maps and return all maps with tier/boss/tileset info."""
+    """Scrape Atlas_of_Worlds and return all maps with tier/boss/link info."""
     cached = _map_cache.get()
     if cached is not None:
         return cached
 
-    soup = fetch_page(f"{BASE_URL}/Maps")
-
-    # Find the Maps List table (header contains "Maps List")
-    table = None
-    for h5 in soup.find_all("h5"):
-        if "Maps List" in h5.get_text(strip=True):
-            card = h5.find_parent("div", class_="card")
-            if card:
-                table = card.find("table")
-            break
-
-    if not table:
-        return []
-
+    soup = fetch_page(ATLAS_URL)
     maps = []
-    for tr in table.find_all("tr")[1:]:  # skip header row
-        tds = tr.find_all("td")
-        if len(tds) < 7:
+
+    for entry in soup.select("div.d-flex.border-top.rounded"):
+        body = entry.select_one("div.flex-grow-1")
+        if not body:
             continue
 
-        # Columns: T, Imprint, Icon, Name, Tier, Boss, Tileset
-        name_td = tds[3]
-        name_link = name_td.find("a")
-        if not name_link:
+        # Map name: first div with no class inside the body
+        name_div = body.find("div", class_="")
+        if not name_div:
+            continue
+        name = name_div.get_text(strip=True)
+        if not name:
             continue
 
-        name = name_link.get_text(strip=True)
-        href = name_link.get("href", "")
-        url = f"https://poedb.tw/us/{href}" if not href.startswith("http") else href
+        tier = ""
+        boss = ""
+        linked = []
 
-        tiers = tds[4].get_text(strip=True)
+        for prop in body.select("div.property"):
+            text = prop.get_text(separator=" ", strip=True)
+            if text.startswith("Tier:"):
+                tier = text.replace("Tier:", "").strip()
+            elif text.startswith("Boss Fights:"):
+                boss = text.replace("Boss Fights:", "").strip()
+            elif text.startswith("Link:"):
+                linked = [a.get_text(strip=True) for a in prop.find_all("a")]
 
-        # Boss may have multiple links separated by <br>
-        boss_links = tds[5].find_all("a")
-        bosses = [a.get_text(strip=True) for a in boss_links if a.get_text(strip=True)]
-        boss = ", ".join(bosses) if bosses else tds[5].get_text(strip=True)
-
-        tileset_link = tds[6].find("a")
-        tileset = tileset_link.get_text(strip=True) if tileset_link else tds[6].get_text(strip=True)
+        # Map detail URL — guess from name (poedb uses underscores)
+        slug = name.replace(" ", "_")
+        url = f"https://poedb.tw/us/{slug}"
 
         maps.append({
             "name": name,
             "url": url,
-            "tiers": tiers,
+            "tiers": tier,
             "boss": boss,
-            "tileset": tileset,
+            "linked": linked,
         })
 
     _map_cache.set(maps)
@@ -64,7 +59,6 @@ def _get_all_maps() -> list[dict]:
 
 
 def format_map(m: dict) -> str:
-    """Format a map dict as a concise search result line."""
     parts = [f"- **{m['name']}**"]
     if m["tiers"]:
         parts.append(f"(T{m['tiers']})")
@@ -74,10 +68,8 @@ def format_map(m: dict) -> str:
 
 
 def get_map_detail(name: str) -> str:
-    """Fetch a map's detail page and return formatted info."""
     maps = _get_all_maps()
 
-    # Find map in cache (exact then case-insensitive)
     cached = None
     name_lower = name.lower()
     for m in maps:
@@ -96,18 +88,16 @@ def get_map_detail(name: str) -> str:
         url = f"{BASE_URL}/{name.replace(' ', '_')}"
 
     sections = []
-
     if cached:
         sections.append(f"# {cached['name']}")
         if cached["tiers"]:
-            sections.append(f"**Tiers:** {cached['tiers']}")
+            sections.append(f"**Tier:** {cached['tiers']}")
         if cached["boss"]:
             sections.append(f"**Boss:** {cached['boss']}")
-        if cached["tileset"]:
-            sections.append(f"**Tileset:** {cached['tileset']}")
+        if cached["linked"]:
+            sections.append(f"**Connected maps:** {', '.join(cached['linked'])}")
         sections.append("")
 
-    # Try to fetch detail page for extras
     try:
         soup = fetch_page(url)
     except httpx.HTTPStatusError:
@@ -117,28 +107,20 @@ def get_map_detail(name: str) -> str:
         return f"Could not find map '{name}'. Try env_search to find the correct name."
 
     if not cached:
-        sections.append(f"# {name}")
-        sections.append("")
+        sections.append(f"# {name}\n")
 
-    # Table 0 has area attributes including Atlas Linked
     tables = soup.find_all("table")
     if tables:
-        attr_table = tables[0]
-        for tr in attr_table.find_all("tr"):
+        for tr in tables[0].find_all("tr"):
             tds = tr.find_all("td")
             if len(tds) < 2:
                 continue
             key = tds[0].get_text(strip=True)
-            if key == "Atlas Linked":
-                linked = [a.get_text(strip=True) for a in tds[1].find_all("a")]
-                if linked:
-                    sections.append(f"**Connected maps:** {', '.join(linked)}")
-            elif key == "Level":
+            if key == "Level":
                 sections.append(f"**Area level:** {tds[1].get_text(strip=True)}")
             elif key == "Vaal Area":
                 sections.append(f"**Vaal area:** {tds[1].get_text(strip=True)}")
 
-    # Community Wiki link
     wiki_link = soup.find("a", string="Community Wiki")
     if wiki_link and wiki_link.get("href"):
         sections.append(f"**Community Wiki:** {wiki_link['href']}")
