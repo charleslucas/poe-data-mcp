@@ -4,6 +4,12 @@ An MCP server that gives any LLM access to Path of Exile game data — gems, uni
 
 Data is fetched at runtime from [poedb.tw](https://poedb.tw), [poe.ninja](https://poe.ninja), and [poewiki.net](https://www.poewiki.net). No API key required.
 
+## Part of poe_mcp_suite
+
+This server is part of [poe_mcp_suite](https://github.com/charleslucas/poe_mcp_suite) — a collection of MCP servers for Path of Exile designed to work together with Claude. See the suite repo for an overview of all available servers and tools.
+
+---
+
 ## Installation
 
 ### Requirements
