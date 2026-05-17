@@ -1,4 +1,13 @@
-"""poe.ninja economy data — price checking and currency overview."""
+"""poe.ninja economy data — price checking and currency overview.
+
+Uses two poe.ninja API endpoints:
+  Exchange: /poe1/api/economy/exchange/current/overview  — bulk tradeable items
+            (currencies, div cards, scarabs, essences, oils, fossils, etc.)
+            Response: {"lines": [{id, primaryValue, sparkline}], "items": [{id, name}]}
+
+  Stash:    /poe1/api/economy/stash/current/item/overview — unique items, gems, maps, etc.
+            Response: {"lines": [{name, chaosValue, divineValue, sparkLine, listingCount}]}
+"""
 
 import re
 import time
@@ -7,26 +16,48 @@ import httpx
 
 from scrapers.common import HEADERS
 
-NINJA_CURRENCY_URL = "https://poe.ninja/api/data/currencyoverview"
-NINJA_ITEM_URL = "https://poe.ninja/api/data/itemoverview"
-NINJA_HOME = "https://poe.ninja/"
+NINJA_EXCHANGE_URL = "https://poe.ninja/poe1/api/economy/exchange/current/overview"
+NINJA_STASH_URL    = "https://poe.ninja/poe1/api/economy/stash/current/item/overview"
+NINJA_HOME         = "https://poe.ninja/"
 
-CURRENCY_TYPES = ["Currency", "Fragment"]
-ITEM_TYPES = {
-    "unique": ["UniqueWeapon", "UniqueArmour", "UniqueAccessory", "UniqueFlask", "UniqueJewel"],
-    "gem": ["SkillGem"],
-    "divcard": ["DivinationCard"],
-    "map": ["Map"],
-    "essence": ["Essence"],
-    "scarab": ["Scarab"],
-    "oil": ["Oil"],
-    "fossil": ["Fossil"],
-    "cluster": ["ClusterJewel"],
-    "base": ["BaseType"],
-    "vial": ["Vial"],
-    "omen": ["Omen"],
-    "invitation": ["Invitation"],
+# Bulk-tradeable items — served by the exchange endpoint
+EXCHANGE_TYPES = {
+    "currency":   ["Currency"],
+    "fragment":   ["Fragment"],
+    "divcard":    ["DivinationCard"],
+    "scarab":     ["Scarab"],
+    "essence":    ["Essence"],
+    "oil":        ["Oil"],
+    "fossil":     ["Fossil"],
+    "omen":       ["Omen"],
+    "tattoo":     ["Tattoo"],
+    "allflame":   ["AllflameEmber"],
+    "artifact":   ["Artifact"],
+    "delirium":   ["DeliriumOrb"],
+    "astrolabe":  ["Astrolabe"],
+    "resonator":  ["Resonator"],
+    "wombgift":   ["Wombgift"],
+    "incubator":  ["Incubator"],
 }
+
+# Equipment, gems, maps — served by the stash endpoint
+STASH_TYPES = {
+    "unique":          ["UniqueWeapon", "UniqueArmour", "UniqueAccessory", "UniqueFlask", "UniqueJewel"],
+    "forbiddenjewel":  ["ForbiddenJewel"],
+    "shrinebelt":      ["ShrineBelt"],
+    "tincture":        ["UniqueTincture"],
+    "relic":           ["UniqueRelic"],
+    "gem":             ["SkillGem"],
+    "cluster":         ["ClusterJewel"],
+    "map":             ["Map", "BlightedMap", "BlightRavagedMap", "UniqueMap"],
+    "invitation":      ["Invitation"],
+    "base":            ["BaseType"],
+    "beast":           ["Beast"],
+    "vial":            ["Vial"],
+}
+
+# All known categories (for help text and validation)
+ALL_TYPES = {**EXCHANGE_TYPES, **STASH_TYPES}
 
 # Categories searched when no category hint is given (most common first)
 DEFAULT_SEARCH_ORDER = ["currency", "unique", "gem", "divcard", "map"]
@@ -36,17 +67,13 @@ _league_cache: str | None = None
 _league_cache_ts: float = 0
 _LEAGUE_TTL = 3600  # 1 hour
 
-_ninja_cache: dict[tuple[str, str], tuple[float, list]] = {}
+# Cache keyed by (endpoint, league, type_name)
+_ninja_cache: dict[tuple[str, str, str], tuple[float, list, list]] = {}
 _NINJA_TTL = 900  # 15 minutes
 
 
 def _get_current_league() -> str:
-    """Auto-detect current temp league from poe.ninja homepage.
-
-    Scrapes the poe.ninja homepage for league names referenced in URLs
-    like /economy/phrecia/ and validates the league has data.
-    Falls back to Standard if no temp league is found.
-    """
+    """Auto-detect current temp league from poe.ninja homepage."""
     global _league_cache, _league_cache_ts
     if _league_cache and (time.time() - _league_cache_ts) < _LEAGUE_TTL:
         return _league_cache
@@ -55,17 +82,15 @@ def _get_current_league() -> str:
     try:
         resp = httpx.get(NINJA_HOME, headers=HEADERS, follow_redirects=True, timeout=15)
         resp.raise_for_status()
-        # Find league names in URLs like /economy/phrecia/ or /challenge/phrecia
         candidates = re.findall(r'/(?:economy|challenge)/([a-z][a-z0-9-]+)', resp.text.lower())
         seen = set()
         for c in candidates:
             if c in permanent or c in seen:
                 continue
             seen.add(c)
-            # Capitalize for API use and validate it has data
             league_name = c.capitalize()
-            test = _fetch_ninja_raw(NINJA_CURRENCY_URL, league_name, "Currency")
-            if test:
+            lines, _ = _fetch_exchange_raw(league_name, "Currency")
+            if lines:
                 _league_cache = league_name
                 _league_cache_ts = time.time()
                 return league_name
@@ -80,11 +105,28 @@ def _resolve_league(league: str) -> str:
     return league if league else _get_current_league()
 
 
-def _fetch_ninja_raw(base_url: str, league: str, type_name: str) -> list:
-    """Fetch data from poe.ninja API (no caching)."""
+def _fetch_exchange_raw(league: str, type_name: str) -> tuple[list, list]:
+    """Fetch from exchange endpoint. Returns (lines, items) — items maps id->name."""
     try:
         resp = httpx.get(
-            base_url,
+            NINJA_EXCHANGE_URL,
+            params={"league": league, "type": type_name},
+            headers=HEADERS,
+            follow_redirects=True,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("lines", []), data.get("items", [])
+    except Exception:
+        return [], []
+
+
+def _fetch_stash_raw(league: str, type_name: str) -> list:
+    """Fetch from stash endpoint. Returns lines with name/chaosValue/divineValue directly."""
+    try:
+        resp = httpx.get(
+            NINJA_STASH_URL,
             params={"league": league, "type": type_name},
             headers=HEADERS,
             follow_redirects=True,
@@ -96,23 +138,26 @@ def _fetch_ninja_raw(base_url: str, league: str, type_name: str) -> list:
         return []
 
 
-def _fetch_ninja(base_url: str, league: str, type_name: str) -> list:
-    """Fetch data from poe.ninja API with caching."""
-    key = (league, type_name)
+def _fetch_exchange(league: str, type_name: str) -> tuple[list, list]:
+    """Cached exchange fetch."""
+    key = ("exchange", league, type_name)
+    cached = _ninja_cache.get(key)
+    if cached and (time.time() - cached[0]) < _NINJA_TTL:
+        return cached[1], cached[2]
+    lines, items = _fetch_exchange_raw(league, type_name)
+    _ninja_cache[key] = (time.time(), lines, items)
+    return lines, items
+
+
+def _fetch_stash(league: str, type_name: str) -> list:
+    """Cached stash fetch."""
+    key = ("stash", league, type_name)
     cached = _ninja_cache.get(key)
     if cached and (time.time() - cached[0]) < _NINJA_TTL:
         return cached[1]
-    lines = _fetch_ninja_raw(base_url, league, type_name)
-    _ninja_cache[key] = (time.time(), lines)
+    lines = _fetch_stash_raw(league, type_name)
+    _ninja_cache[key] = (time.time(), lines, [])
     return lines
-
-
-def _fetch_currency(league: str, type_name: str) -> list:
-    return _fetch_ninja(NINJA_CURRENCY_URL, league, type_name)
-
-
-def _fetch_items(league: str, type_name: str) -> list:
-    return _fetch_ninja(NINJA_ITEM_URL, league, type_name)
 
 
 def _match_score(query: str, name: str) -> int:
@@ -139,39 +184,40 @@ def _format_trend(sparkline: dict | None) -> str:
     return f"{sign}{change:.1f}%"
 
 
-def _search_currency(query: str, league: str) -> list[dict]:
-    """Search currency/fragment types."""
+def _search_exchange(query: str, league: str, categories: list[str]) -> list[dict]:
+    """Search exchange-endpoint categories (currencies, div cards, scarabs, etc.)."""
     results = []
-    for type_name in CURRENCY_TYPES:
-        lines = _fetch_currency(league, type_name)
-        for line in lines:
-            name = line.get("currencyTypeName", "")
-            score = _match_score(query, name)
-            if score > 0:
-                chaos = line.get("chaosEquivalent", 0)
-                receive = line.get("receive") or {}
-                results.append({
-                    "name": name,
-                    "chaos_value": chaos,
-                    "divine_value": None,
-                    "listing_count": receive.get("listing_count", 0),
-                    "trend_7d": _format_trend(line.get("receiveSparkLine")),
-                    "category": type_name,
-                    "_score": score,
-                })
+    for cat in categories:
+        for type_name in EXCHANGE_TYPES.get(cat, []):
+            lines, items = _fetch_exchange(league, type_name)
+            id_to_name = {item["id"]: item["name"] for item in items}
+            for line in lines:
+                name = id_to_name.get(line.get("id", ""), "")
+                if not name:
+                    continue
+                score = _match_score(query, name)
+                if score > 0:
+                    chaos = line.get("primaryValue", 0)
+                    results.append({
+                        "name": name,
+                        "chaos_value": chaos,
+                        "divine_value": None,
+                        "listing_count": line.get("volumePrimaryValue", 0),
+                        "trend_7d": _format_trend(line.get("sparkline")),
+                        "category": type_name,
+                        "_score": score,
+                    })
     return results
 
 
-def _search_items(query: str, league: str, categories: list[str]) -> list[dict]:
-    """Search item types."""
+def _search_stash(query: str, league: str, categories: list[str]) -> list[dict]:
+    """Search stash-endpoint categories (uniques, gems, maps, etc.)."""
     results = []
     for cat in categories:
-        type_names = ITEM_TYPES.get(cat, [])
-        for type_name in type_names:
-            lines = _fetch_items(league, type_name)
+        for type_name in STASH_TYPES.get(cat, []):
+            lines = _fetch_stash(league, type_name)
             for line in lines:
                 name = line.get("name", "")
-                # For gems, include variant info
                 variant = line.get("variant", "")
                 display = f"{name} ({variant})" if variant else name
                 score = _match_score(query, name)
@@ -181,7 +227,7 @@ def _search_items(query: str, league: str, categories: list[str]) -> list[dict]:
                         "chaos_value": line.get("chaosValue", 0),
                         "divine_value": line.get("divineValue"),
                         "listing_count": line.get("listingCount", 0),
-                        "trend_7d": _format_trend(line.get("sparkline")),
+                        "trend_7d": _format_trend(line.get("sparkLine")),
                         "category": type_name,
                         "links": line.get("links"),
                         "gem_level": line.get("gemLevel"),
@@ -193,7 +239,6 @@ def _search_items(query: str, league: str, categories: list[str]) -> list[dict]:
 
 def _format_results(results: list[dict], max_results: int = 10) -> str:
     """Format matched results into readable output."""
-    # Sort by score desc, then chaos value desc
     results.sort(key=lambda r: (-r["_score"], -(r["chaos_value"] or 0)))
     results = results[:max_results]
 
@@ -203,16 +248,16 @@ def _format_results(results: list[dict], max_results: int = 10) -> str:
     lines = []
     for r in results:
         parts = [f"**{r['name']}**"]
-        parts.append(f"  Chaos: {r['chaos_value']:.1f}")
+        parts.append(f"  Chaos: {r['chaos_value']:,.1f}")
         if r.get("divine_value") is not None:
-            parts.append(f"  Divine: {r['divine_value']:.2f}")
+            parts.append(f"  Divine: {r['divine_value']:,.2f}")
         if r.get("links"):
             parts.append(f"  Links: {r['links']}")
         if r.get("gem_level"):
             parts.append(f"  Level: {r['gem_level']}")
         if r.get("gem_quality"):
             parts.append(f"  Quality: {r['gem_quality']}%")
-        parts.append(f"  Listings: {r['listing_count']}")
+        parts.append(f"  Listings: {r['listing_count']:,}")
         parts.append(f"  7d trend: {r['trend_7d']}")
         parts.append(f"  Category: {r['category']}")
         lines.append("\n".join(parts))
@@ -221,33 +266,40 @@ def _format_results(results: list[dict], max_results: int = 10) -> str:
 
 
 async def price_check(query: str, league: str = "", category: str = "") -> str:
-    """Search poe.ninja for an item/currency by name.
+    """Search poe.ninja for the current price of any item or currency.
 
     Args:
-        query: Search keyword to match against item names.
-        league: Optional league name. Defaults to current temp league (auto-detected).
-        category: Optional hint — "currency", "unique", "gem", "divcard", "map", etc. If empty, searches across common categories.
+        query: Item name to search (partial match supported).
+        league: League name. Defaults to current temp league (auto-detected).
+        category: Optional hint to narrow search. Options: currency, fragment,
+                  divcard, scarab, essence, oil, fossil, omen, tattoo, allflame,
+                  artifact, delirium, astrolabe, resonator, wombgift, incubator,
+                  unique, forbiddenjewel, shrinebelt, tincture, relic, gem,
+                  cluster, map, invitation, base, beast, vial.
     """
     league = _resolve_league(league)
     results: list[dict] = []
 
     if category:
         cat = category.lower()
-        if cat in ("currency", "fragment"):
-            results = _search_currency(query, league)
-        elif cat in ITEM_TYPES:
-            results = _search_items(query, league, [cat])
+        if cat in EXCHANGE_TYPES:
+            results = _search_exchange(query, league, [cat])
+        elif cat in STASH_TYPES:
+            results = _search_stash(query, league, [cat])
         else:
-            return f"Unknown category '{category}'. Available: currency, {', '.join(ITEM_TYPES.keys())}"
+            return (
+                f"Unknown category '{category}'. "
+                f"Available: {', '.join(sorted(ALL_TYPES.keys()))}"
+            )
     else:
-        # Search common categories, stop early if we have enough
-        results = _search_currency(query, league)
-        if len(results) < 10:
-            search_cats = [c for c in DEFAULT_SEARCH_ORDER if c != "currency"]
-            for cat in search_cats:
-                results.extend(_search_items(query, league, [cat]))
-                if len(results) >= 10:
-                    break
+        # Search common categories in order, stop when we have enough
+        for cat in DEFAULT_SEARCH_ORDER:
+            if cat in EXCHANGE_TYPES:
+                results.extend(_search_exchange(query, league, [cat]))
+            elif cat in STASH_TYPES:
+                results.extend(_search_stash(query, league, [cat]))
+            if len(results) >= 10:
+                break
 
     header = f"**Price Check** — League: {league}\n\n"
     return header + _format_results(results)
@@ -257,24 +309,26 @@ async def currency_overview(league: str = "") -> str:
     """Returns top currency exchange rates for quick reference.
 
     Args:
-        league: Optional league name. Defaults to current temp league (auto-detected).
+        league: League name. Defaults to current temp league (auto-detected).
     """
     league = _resolve_league(league)
-    lines = _fetch_currency(league, "Currency")
+    lines, items = _fetch_exchange(league, "Currency")
 
     if not lines:
         return f"No currency data found for league '{league}'."
 
-    # Sort by chaos value descending
-    lines.sort(key=lambda x: x.get("chaosEquivalent", 0), reverse=True)
-    top = lines[:20]
+    id_to_name = {item["id"]: item["name"] for item in items}
+    lines_with_names = [
+        (id_to_name.get(l["id"], l["id"]), l.get("primaryValue", 0))
+        for l in lines
+    ]
+    lines_with_names.sort(key=lambda x: x[1], reverse=True)
+    top = lines_with_names[:20]
 
     rows = [f"**Currency Overview** — League: {league}\n"]
     rows.append(f"{'Name':<30} {'Chaos Value':>12}")
     rows.append("-" * 44)
-    for item in top:
-        name = item.get("currencyTypeName", "?")
-        chaos = item.get("chaosEquivalent", 0)
+    for name, chaos in top:
         rows.append(f"{name:<30} {chaos:>12,.1f}")
 
     return "\n".join(rows)
