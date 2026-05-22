@@ -9,6 +9,7 @@ from scrapers.economy import currency_overview, price_check
 from scrapers.wiki import fetch_wiki_page
 from scrapers.player.pob import parse_pob
 from scrapers.youtube import fetch_youtube_description, fetch_youtube_transcript
+from scrapers.reddit import fetch_reddit_post
 
 mcp = FastMCP("PoeMCP")
 
@@ -40,6 +41,9 @@ mcp.tool()(parse_pob)
 # --- YouTube ---
 mcp.tool()(fetch_youtube_description)
 mcp.tool()(fetch_youtube_transcript)
+
+# --- Reddit ---
+mcp.tool()(fetch_reddit_post)
 
 def main():
     mcp.run()
