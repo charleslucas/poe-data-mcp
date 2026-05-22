@@ -79,12 +79,19 @@ def _fetch_raw(url: str) -> str:
         # https://pobb.in/{id}            → https://pobb.in/{id}/raw
         # https://pobb.in/u/{user}/{id}   → https://pobb.in/u/{user}/{id}/raw
         raw_url = url + "/raw"
+    elif "poedb.tw" in url:
+        # https://poedb.tw/{locale}/PathOfBuilding?id={id} → https://poedb.tw/pob/{id}/raw
+        import re as _urlre
+        m = _urlre.search(r"[?&]id=([^&]+)", url)
+        if not m:
+            raise ValueError(f"Could not extract build ID from poedb.tw URL: {url}")
+        raw_url = f"https://poedb.tw/pob/{m.group(1)}/raw"
     elif "pastebin.com" in url:
         # https://pastebin.com/{id} → https://pastebin.com/raw/{id}
         paste_id = url.rstrip("/").split("/")[-1]
         raw_url = f"https://pastebin.com/raw/{paste_id}"
     else:
-        raise ValueError("Unsupported URL. Supported: pobb.in, pastebin.com")
+        raise ValueError("Unsupported URL. Supported: pobb.in, poedb.tw, pastebin.com")
 
     resp = httpx.get(raw_url, headers=HEADERS, follow_redirects=True, timeout=30)
     resp.raise_for_status()
