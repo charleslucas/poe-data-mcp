@@ -1,5 +1,7 @@
 # PoeMCP
 
+> **This product is not affiliated with or endorsed by Grinding Gear Games in any way.**
+
 An MCP server that gives any LLM access to Path of Exile game data — gems, unique items, passive tree nodes, item modifiers, maps, scarabs, live pricing, and Path of Building build parsing.
 
 Data is fetched at runtime from [poedb.tw](https://poedb.tw), [poe.ninja](https://poe.ninja), and [poewiki.net](https://www.poewiki.net). No API key required.
