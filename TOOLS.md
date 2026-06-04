@@ -44,11 +44,14 @@ Entry point: `server.py`.
 
 ---
 
-## Wiki
+## Wiki & External Content
 
 | Tool | Description |
 |------|-------------|
 | `fetch_wiki_page` | Fetch clean content from a poewiki.net page (navigation/noise stripped) |
+| `fetch_reddit_post` | Fetch a Reddit post and its top comments |
+| `fetch_youtube_transcript` | Fetch the transcript of a YouTube video |
+| `fetch_youtube_description` | Fetch the description of a YouTube video |
 
 ---
 
