@@ -1,15 +1,21 @@
 from mcp.server.fastmcp import FastMCP
 
-from scrapers.player.gems import get_gem_detail, search_gem
-from scrapers.player.items import get_item_detail, search_item
-from scrapers.player.passives import get_passive_detail, search_passive
-from scrapers.mods.item_mods import search_mods
-from scrapers.env import env_detail, env_search
-from scrapers.economy import currency_overview, price_check
-from scrapers.wiki import fetch_wiki_page
-from scrapers.player.pob import parse_pob
-from scrapers.youtube import fetch_youtube_description, fetch_youtube_transcript
-from scrapers.reddit import fetch_reddit_post
+from sources.player.gems import get_gem_detail, search_gem
+from sources.player.items import get_item_detail, search_item
+from sources.player.passives import get_passive_detail, search_passive
+from sources.mods.item_mods import search_mods
+from sources.crafting.craftofexile import (
+    craftofexile_cache_status,
+    update_craftofexile_cache,
+    search_craft_mods,
+    get_craft_base_items,
+)
+from sources.env import env_detail, env_search
+from sources.economy import currency_overview, price_check
+from sources.wiki import fetch_wiki_page
+from sources.player.pob import parse_pob
+from sources.youtube import fetch_youtube_description, fetch_youtube_transcript
+from sources.reddit import fetch_reddit_post
 
 mcp = FastMCP("PoeMCP")
 
@@ -23,6 +29,12 @@ mcp.tool()(get_passive_detail)
 
 # --- Mods domain ---
 mcp.tool()(search_mods)
+
+# --- Craft of Exile ---
+mcp.tool()(craftofexile_cache_status)
+mcp.tool()(update_craftofexile_cache)
+mcp.tool()(search_craft_mods)
+mcp.tool()(get_craft_base_items)
 
 # --- Env domain ---
 mcp.tool()(env_search)

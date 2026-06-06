@@ -1,6 +1,6 @@
 import httpx
 
-from scrapers.common import HEADERS, Cache
+from sources.common import HEADERS, Cache
 
 _tree_cache = Cache()
 

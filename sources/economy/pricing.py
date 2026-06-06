@@ -14,7 +14,7 @@ import time
 
 import httpx
 
-from scrapers.common import HEADERS
+from sources.common import HEADERS
 
 NINJA_EXCHANGE_URL = "https://poe.ninja/poe1/api/economy/exchange/current/overview"
 NINJA_STASH_URL    = "https://poe.ninja/poe1/api/economy/stash/current/item/overview"

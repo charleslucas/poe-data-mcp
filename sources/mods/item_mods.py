@@ -6,7 +6,7 @@ import time
 
 import httpx
 
-from scrapers.common import BASE_URL, CACHE_TTL, HEADERS
+from sources.common import BASE_URL, CACHE_TTL, HEADERS
 
 # ---------------------------------------------------------------------------
 # Slug mapping — friendly name → poedb URL slug

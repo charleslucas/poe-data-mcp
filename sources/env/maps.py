@@ -1,6 +1,6 @@
 import httpx
 
-from scrapers.common import BASE_URL, Cache, fetch_page
+from sources.common import BASE_URL, Cache, fetch_page
 
 _map_cache = Cache()
 

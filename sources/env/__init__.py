@@ -1,5 +1,5 @@
-from scrapers.env.maps import _get_all_maps, format_map, get_map_detail
-from scrapers.env.scarabs import _get_all_scarabs, format_scarab, get_scarab_detail
+from sources.env.maps import _get_all_maps, format_map, get_map_detail
+from sources.env.scarabs import _get_all_scarabs, format_scarab, get_scarab_detail
 
 CATEGORIES = {
     "maps": (_get_all_maps, format_map, get_map_detail, "name"),
