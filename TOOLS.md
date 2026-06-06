@@ -26,6 +26,22 @@ Entry point: `server.py`.
 
 ---
 
+## Crafting Research (Craft of Exile)
+
+Data is downloaded from craftofexile.com on first use and cached locally (gitignored). Call `update_craftofexile_cache` first if the cache is empty.
+
+| Tool | Description |
+|------|-------------|
+| `craftofexile_cache_status` | Show which data files are cached and when they were last checked for updates |
+| `update_craftofexile_cache` | Download or refresh Craft of Exile data files (checks for version updates via the site's `?v=` timestamps) |
+| `search_craft_mods` | Search the full mod pool by keyword; optionally filter by item class |
+| `get_craft_base_items` | Look up base items with drop levels; confirm exact base name before crafting |
+| `get_craft_tiers` | Full tier breakdown for a mod on a specific item class — min iLvl, value range, and spawn weight per tier |
+| `get_fossil_info` | Fossil mod type affinities: which categories it boosts, reduces, or blocks |
+| `get_essence_mods` | Guaranteed mod an essence provides on each item slot; filterable by slot |
+
+---
+
 ## Environment (Maps & Scarabs)
 
 | Tool | Description |
