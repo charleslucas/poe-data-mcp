@@ -198,6 +198,45 @@ def _common() -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Internal helpers for the richer tools
+# ---------------------------------------------------------------------------
+
+def _require_cache() -> str | None:
+    """Return an error string if any data file is missing, else None."""
+    missing = [f for f in _DATA_FILES if not (CACHE_DIR / f).exists()]
+    if missing:
+        return (
+            "Craft of Exile data not cached yet.\n"
+            "Run `update_craftofexile_cache()` to download the required files first.\n\n"
+            f"Missing: {', '.join(missing)}"
+        )
+    return None
+
+
+def _parse_pipe_ids(pipe_str: str | None) -> list[str]:
+    """Parse '|5|16|17|' into ['5', '16', '17']."""
+    if not pipe_str:
+        return []
+    return [x for x in pipe_str.split("|") if x.strip()]
+
+
+def _build_base_id_map() -> dict[str, str]:
+    """Return {id_base_str: name_base} from bases.seq."""
+    return {
+        str(e.get("id_base", "")): e.get("name_base", "")
+        for e in _data().get("bases", {}).get("seq", [])
+    }
+
+
+def _build_mtype_id_map() -> dict[str, str]:
+    """Return {id_mtype_str: name_mtype} from mtypes.seq."""
+    return {
+        str(e.get("id_mtype", "")): e.get("name_mtype", "")
+        for e in _data().get("mtypes", {}).get("seq", [])
+    }
+
+
+# ---------------------------------------------------------------------------
 # Public MCP tools
 # ---------------------------------------------------------------------------
 
@@ -351,6 +390,265 @@ def search_craft_mods(query: str, item_class: str = "") -> str:
 
     if len(matches) > 100:
         lines.append(f"\n*Showing first 100 of {len(matches)}. Narrow with a more specific query.*")
+
+    return "\n".join(lines)
+
+
+def get_craft_tiers(base_type: str, query: str) -> str:
+    """Show tier value ranges and spawn weights for a craftable mod on a specific item class.
+
+    Looks up mods matching the keyword query and returns every tier's minimum item level,
+    value range, and spawn weight — the raw numbers behind crafting probability. Tiers are
+    shown highest-first (T1 = best values, lowest weight / hardest to roll).
+
+    Only tiers with non-zero weight are shown; zero-weight entries are unrollable
+    (removed or debug mods) and are silently excluded.
+
+    Args:
+        base_type: Item class to look up tiers for. Partial, case-insensitive match.
+                   Examples: 'staff', 'ring', 'helmet', 'bow', 'glove'.
+                   Use 'warstaff' for warstaves. Matches against the class name,
+                   not individual base item names.
+        query: Keyword to search mod text for. Examples: 'increased physical damage',
+               'maximum life', 'attack speed', 'critical strike multiplier'.
+    """
+    err = _require_cache()
+    if err:
+        return err
+
+    d = _data()
+    lang_mods = _lang().get("mod", {})
+    tiers_data = d.get("tiers", {})
+    mods_seq = d.get("modifiers", {}).get("seq", [])
+
+    bases_by_id = _build_base_id_map()
+
+    bt = base_type.lower()
+    target_base_ids = {bid for bid, name in bases_by_id.items() if bt in name.lower()}
+    if not target_base_ids:
+        sample = sorted(set(bases_by_id.values()))[:25]
+        return (
+            f"No item class matching '{base_type}'.\n"
+            f"Known classes (sample): {', '.join(sample)}"
+        )
+
+    # Index modifiers for affix/modgroup lookup
+    mod_detail: dict[str, dict] = {}
+    for m in mods_seq:
+        mid = str(m.get("id_modifier", ""))
+        if mid:
+            mod_detail[mid] = m
+
+    q = query.lower()
+    results = []
+
+    for mod_id, tier_by_base in tiers_data.items():
+        relevant = target_base_ids & set(tier_by_base.keys())
+        if not relevant:
+            continue
+
+        # Get display text from lang, fall back to modifier name
+        text = lang_mods.get(mod_id) or lang_mods.get(int(mod_id) if str(mod_id).isdigit() else mod_id, "")
+        if isinstance(text, dict):
+            text = text.get("text", str(text))
+        if not isinstance(text, str):
+            text = ""
+        info = mod_detail.get(str(mod_id), {})
+        fallback_name = info.get("name_modifier", "")
+
+        if q not in (text + " " + fallback_name).lower():
+            continue
+
+        display = text or fallback_name or f"mod {mod_id}"
+        affix = info.get("affix", "?")
+        modgroup = info.get("modgroup", "?")
+
+        for bid in sorted(relevant):
+            # Exclude zero-weight (unrollable) tiers
+            tier_entries = [
+                t for t in tier_by_base[bid]
+                if str(t.get("weighting", "0")) != "0"
+            ]
+            if not tier_entries:
+                continue
+            results.append((display, mod_id, bid, bases_by_id[bid], affix, modgroup, tier_entries))
+
+    if not results:
+        return (
+            f"No rollable tiers found for '{query}' on '{base_type}'.\n"
+            "Try a simpler keyword (e.g. 'physical' rather than 'increased physical damage')."
+        )
+
+    lines = [f"## Craft of Exile — '{query}' tiers on {base_type}", ""]
+
+    for display, mod_id, bid, base_name, affix, modgroup, tier_entries in results:
+        lines.append(f"### {display}")
+        lines.append(
+            f"ID: {mod_id} | {affix} | group: {modgroup} | item class: {base_name} (id {bid})"
+        )
+        lines.append("")
+        lines.append("| Tier | Min iLvl | Values | Weight |")
+        lines.append("|------|----------|--------|--------|")
+
+        sorted_tiers = sorted(tier_entries, key=lambda t: int(t.get("ilvl", 0)), reverse=True)
+        for i, t in enumerate(sorted_tiers):
+            ilvl = t.get("ilvl", "?")
+            raw_nv = t.get("nvalues", "?")
+            weight = t.get("weighting", "?")
+            try:
+                vals = json.loads(raw_nv)
+                parts = []
+                for v in vals:
+                    if isinstance(v, list) and len(v) == 2:
+                        parts.append(f"{v[0]}–{v[1]}")
+                    else:
+                        parts.append(str(v))
+                formatted = ", ".join(parts)
+            except Exception:
+                formatted = raw_nv
+            lines.append(f"| T{i + 1} | {ilvl} | {formatted} | {weight} |")
+
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def get_fossil_info(fossil_name: str) -> str:
+    """Look up a fossil's mod type affinities: what it boosts, reduces, and blocks.
+
+    Returns the mod type categories it makes more likely, less likely, and blocked —
+    useful for planning fossil-crafting strategies (e.g. which fossil boosts physical
+    mods without blocking life mods).
+
+    Args:
+        fossil_name: Fossil name to look up. Partial, case-insensitive match.
+                     Examples: 'pristine', 'aberrant', 'jagged', 'dense'.
+                     Use a partial name to list all matching fossils.
+    """
+    err = _require_cache()
+    if err:
+        return err
+
+    d = _data()
+    fossils = d.get("fossils", {}).get("seq", [])
+    mtype_names = _build_mtype_id_map()
+
+    fl = fossil_name.lower()
+    matches = [f for f in fossils if fl in f.get("name_fossil", "").lower()]
+
+    if not matches:
+        all_names = sorted(f.get("name_fossil", "") for f in fossils)
+        return (
+            f"No fossil matching '{fossil_name}'.\n"
+            f"Known fossils: {', '.join(all_names)}"
+        )
+
+    lines = []
+    for fossil in matches:
+        name = fossil.get("name_fossil", "?")
+        lines.append(f"## {name} Fossil")
+        lines.append("")
+
+        more = _parse_pipe_ids(fossil.get("more_list"))
+        less = _parse_pipe_ids(fossil.get("less_list"))
+        block = _parse_pipe_ids(fossil.get("block_list"))
+
+        if more:
+            names = [mtype_names.get(x, f"type {x}") for x in more]
+            lines.append(f"**More likely** (boosted): {', '.join(names)}")
+        if less:
+            names = [mtype_names.get(x, f"type {x}") for x in less]
+            lines.append(f"**Less likely** (reduced): {', '.join(names)}")
+        if block:
+            names = [mtype_names.get(x, f"type {x}") for x in block]
+            lines.append(f"**Blocked**: {', '.join(names)}")
+        if not more and not less and not block:
+            lines.append("No affinity data found for this fossil.")
+
+        # mod_data gives numeric weight multipliers per mod category
+        raw_mod_data = fossil.get("mod_data")
+        if raw_mod_data:
+            try:
+                mod_data: dict = json.loads(raw_mod_data)
+                lines.append("")
+                lines.append("**Raw affinity weights** (0 = blocked; higher = more weight in the mod pool):")
+                lines.append("")
+                lines.append("| Mod Category | Weight |")
+                lines.append("|--------------|--------|")
+                for cat, weight in sorted(mod_data.items(), key=lambda x: -x[1]):
+                    w_str = "blocked" if weight == 0 else str(weight)
+                    lines.append(f"| {cat} | {w_str} |")
+            except Exception:
+                pass
+
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def get_essence_mods(essence_name: str, item_type: str = "") -> str:
+    """Look up the guaranteed mod an essence provides on each item type.
+
+    Essences guarantee one specific mod when used on an item, replacing a random
+    mod with a fixed one. This tool shows those guaranteed mods, optionally filtered
+    to a specific item slot.
+
+    Args:
+        essence_name: Essence name to look up. Partial, case-insensitive match.
+                      Examples: 'anger', 'delirium', 'dread', 'woe'.
+                      Omit the 'Screaming'/'Shrieking'/etc. tier prefix — search
+                      by the base name and all tiers will be shown.
+        item_type: Optional slot filter. Partial, case-insensitive.
+                   Examples: 'staff', 'ring', 'helmet', 'glove', 'amulet'.
+    """
+    err = _require_cache()
+    if err:
+        return err
+
+    d = _data()
+    essences = d.get("essences", {}).get("seq", [])
+
+    el = essence_name.lower()
+    matches = [e for e in essences if el in e.get("name_essence", "").lower()]
+
+    if not matches:
+        all_names = sorted(e.get("name_essence", "") for e in essences)
+        return (
+            f"No essence matching '{essence_name}'.\n"
+            f"Known essences: {', '.join(all_names)}"
+        )
+
+    it = item_type.lower()
+    lines = []
+
+    for essence in matches:
+        name = essence.get("name_essence", "?")
+        lines.append(f"## {name} Essence — Guaranteed Mods")
+        lines.append("")
+
+        raw_tooltip = essence.get("tooltip", "[]")
+        try:
+            tooltip: list = json.loads(raw_tooltip)
+        except Exception:
+            lines.append("Could not parse mod data for this essence.")
+            lines.append("")
+            continue
+
+        filtered = [t for t in tooltip if not it or it in t.get("lbl", "").lower()]
+
+        if not filtered:
+            qualifier = f" for item type '{item_type}'" if it else ""
+            lines.append(f"No guaranteed mods found{qualifier}.")
+            lines.append("")
+            continue
+
+        lines.append("| Slot | Guaranteed Mod |")
+        lines.append("|------|----------------|")
+        for entry in filtered:
+            slot = entry.get("lbl", "?")
+            val = entry.get("val", "?")
+            lines.append(f"| {slot} | {val} |")
+        lines.append("")
 
     return "\n".join(lines)
 

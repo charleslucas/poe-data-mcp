@@ -9,6 +9,9 @@ from sources.crafting.craftofexile import (
     update_craftofexile_cache,
     search_craft_mods,
     get_craft_base_items,
+    get_craft_tiers,
+    get_fossil_info,
+    get_essence_mods,
 )
 from sources.env import env_detail, env_search
 from sources.economy import currency_overview, price_check
@@ -35,6 +38,9 @@ mcp.tool()(craftofexile_cache_status)
 mcp.tool()(update_craftofexile_cache)
 mcp.tool()(search_craft_mods)
 mcp.tool()(get_craft_base_items)
+mcp.tool()(get_craft_tiers)
+mcp.tool()(get_fossil_info)
+mcp.tool()(get_essence_mods)
 
 # --- Env domain ---
 mcp.tool()(env_search)
