@@ -34,11 +34,11 @@ def fetch_youtube_description(url: str) -> str:
 
     try:
         title_result = subprocess.run(
-            ["yt-dlp", "--get-title", "--no-warnings", url],
+            ["yt-dlp", "--get-title", "--socket-timeout", "20", "--no-warnings", url],
             capture_output=True, text=True, timeout=30
         )
         desc_result = subprocess.run(
-            ["yt-dlp", "--get-description", "--no-warnings", url],
+            ["yt-dlp", "--get-description", "--socket-timeout", "20", "--no-warnings", url],
             capture_output=True, text=True, timeout=30
         )
     except subprocess.TimeoutExpired:
@@ -102,11 +102,11 @@ def fetch_youtube_transcript(url: str, include_timestamps: bool = False) -> str:
     # Get title and chapter list from description first (lightweight)
     try:
         title_result = subprocess.run(
-            ["yt-dlp", "--get-title", "--no-warnings", url],
+            ["yt-dlp", "--get-title", "--socket-timeout", "20", "--no-warnings", url],
             capture_output=True, text=True, timeout=15
         )
         desc_result = subprocess.run(
-            ["yt-dlp", "--get-description", "--no-warnings", url],
+            ["yt-dlp", "--get-description", "--socket-timeout", "20", "--no-warnings", url],
             capture_output=True, text=True, timeout=15
         )
         title = title_result.stdout.strip()
@@ -121,12 +121,24 @@ def fetch_youtube_transcript(url: str, include_timestamps: bool = False) -> str:
     # Download transcript to temp dir
     with tempfile.TemporaryDirectory() as tmpdir:
         out_path = os.path.join(tmpdir, "transcript")
-        result = subprocess.run(
-            ["yt-dlp", "--write-auto-subs", "--sub-lang", "en",
-             "--sub-format", "json3", "--skip-download", "--no-warnings",
-             "-o", out_path, url],
-            capture_output=True, text=True, timeout=60
-        )
+        # --socket-timeout makes a stalled connection fail fast instead of
+        # blocking forever; bounded --retries then recovers. Without these,
+        # yt-dlp's defaults (no socket timeout, 10 retries) can hang past the
+        # wrapper timeout on an intermittently stalled timedtext download.
+        try:
+            result = subprocess.run(
+                ["yt-dlp", "--write-auto-subs", "--sub-lang", "en",
+                 "--sub-format", "json3", "--skip-download", "--no-warnings",
+                 "--socket-timeout", "20", "--retries", "3",
+                 "-o", out_path, url],
+                capture_output=True, text=True, timeout=120
+            )
+        except subprocess.TimeoutExpired:
+            return (
+                f"Timed out fetching YouTube transcript for: {url}\n"
+                "yt-dlp stalled on the subtitle download (usually a transient "
+                "stalled connection, not a missing transcript). Try again."
+            )
         if result.returncode != 0:
             err = result.stderr.strip()
             return f"yt-dlp failed to fetch transcript: {err or 'unknown error'}"
