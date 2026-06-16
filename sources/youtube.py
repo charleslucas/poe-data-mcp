@@ -34,11 +34,11 @@ def fetch_youtube_description(url: str) -> str:
 
     try:
         title_result = subprocess.run(
-            ["yt-dlp", "--get-title", "--socket-timeout", "20", "--no-warnings", url],
+            ["yt-dlp", "--get-title", "--force-ipv4", "--socket-timeout", "20", "--no-warnings", url],
             capture_output=True, text=True, timeout=30
         )
         desc_result = subprocess.run(
-            ["yt-dlp", "--get-description", "--socket-timeout", "20", "--no-warnings", url],
+            ["yt-dlp", "--get-description", "--force-ipv4", "--socket-timeout", "20", "--no-warnings", url],
             capture_output=True, text=True, timeout=30
         )
     except subprocess.TimeoutExpired:
@@ -102,11 +102,11 @@ def fetch_youtube_transcript(url: str, include_timestamps: bool = False) -> str:
     # Get title and chapter list from description first (lightweight)
     try:
         title_result = subprocess.run(
-            ["yt-dlp", "--get-title", "--socket-timeout", "20", "--no-warnings", url],
+            ["yt-dlp", "--get-title", "--force-ipv4", "--socket-timeout", "20", "--no-warnings", url],
             capture_output=True, text=True, timeout=15
         )
         desc_result = subprocess.run(
-            ["yt-dlp", "--get-description", "--socket-timeout", "20", "--no-warnings", url],
+            ["yt-dlp", "--get-description", "--force-ipv4", "--socket-timeout", "20", "--no-warnings", url],
             capture_output=True, text=True, timeout=15
         )
         title = title_result.stdout.strip()
@@ -129,7 +129,7 @@ def fetch_youtube_transcript(url: str, include_timestamps: bool = False) -> str:
             result = subprocess.run(
                 ["yt-dlp", "--write-auto-subs", "--sub-lang", "en",
                  "--sub-format", "json3", "--skip-download", "--no-warnings",
-                 "--socket-timeout", "20", "--retries", "3",
+                 "--force-ipv4", "--socket-timeout", "20", "--retries", "3",
                  "-o", out_path, url],
                 capture_output=True, text=True, timeout=120
             )
