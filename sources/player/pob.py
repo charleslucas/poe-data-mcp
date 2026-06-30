@@ -167,7 +167,13 @@ def _parse_skills(root: ET.Element) -> list[dict]:
         if skill.get("enabled", "true").lower() == "false":
             continue
 
-        main_idx = int(skill.get("mainActiveSkill", "1")) - 1  # 1-based → 0-based
+        # PoB serializes a missing main skill as the literal string "nil"
+        # (and the attribute may be absent on older exports). Default to the
+        # first gem in either case rather than crashing on int("nil").
+        try:
+            main_idx = int(skill.get("mainActiveSkill", "1")) - 1  # 1-based → 0-based
+        except ValueError:
+            main_idx = 0
 
         gems = []
         for i, gem in enumerate(skill.findall("Gem")):
@@ -382,9 +388,20 @@ def _parse_passives(root: ET.Element) -> dict:
     if tree_el is None:
         return {"keystones": [], "notables": [], "total": 0}
 
-    spec = tree_el.find("Spec")
-    if spec is None:
+    specs = tree_el.findall("Spec")
+    if not specs:
         return {"keystones": [], "notables": [], "total": 0}
+
+    # Tree Specs have no id; activeSpec is a 1-based index into the Spec list
+    # (a leveling guide can carry many stage trees — default to the first if
+    # the index is missing or out of range rather than the wrong tree).
+    try:
+        active_idx = int(tree_el.get("activeSpec", "1")) - 1
+    except ValueError:
+        active_idx = 0
+    if not 0 <= active_idx < len(specs):
+        active_idx = 0
+    spec = specs[active_idx]
 
     nodes_str = spec.get("nodes", "")
     if not nodes_str:
@@ -463,6 +480,9 @@ def parse_pob(code_or_url: str) -> str:
     level = build.get("level", "?")
 
     title = f"# {char_class}"
+    # PoB sets ascendClassName to the literal "None" for un-ascended characters.
+    if asc == "None":
+        asc = "Unascended"
     if asc and asc != char_class:
         title += f" ({asc})"
     title += f"  —  Level {level}"
