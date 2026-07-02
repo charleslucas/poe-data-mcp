@@ -106,8 +106,25 @@ def get_gem_detail(gem_name: str) -> str:
 
     sections = []
 
+    # poedb's div.gemPopup elements on a gem page are summoned-MONSTER tooltips (they live
+    # inside col-monster cards / monster tab-panes) or a generic "Default Attack" artifact --
+    # NOT the gem's own tooltip. Rendering them produced confidently-wrong output (e.g. the
+    # Absolution spell shown as a wand attack, and minion gems shown as their minion's default
+    # attack). Guard: only render the popup when it actually looks like the gem's tooltip;
+    # otherwise omit it and rely on the (correct) Level Effect table below.
+    # TODO: replace this scraping with a structured gem data source (RePoE / PoB gem data).
+    def _is_gem_tooltip(p) -> bool:
+        if p is None:
+            return False
+        if "Default Attack" in p.get_text(" ", strip=True):
+            return False
+        for anc in p.parents:
+            if "col-monster" in (anc.get("class") or []):
+                return False
+        return True
+
     popup = soup.select_one("div.gemPopup")
-    if popup:
+    if _is_gem_tooltip(popup):
         name_el = popup.select_one("span.lc")
         gem_display_name = name_el.get_text(strip=True) if name_el else gem_name
 
@@ -149,6 +166,16 @@ def get_gem_detail(gem_name: str) -> str:
             for qm in quality_mods:
                 sections.append(f"- {qm}")
             sections.append("")
+    else:
+        sections.append(f"# {gem_name}")
+        sections.append(
+            "> Note: poedb's gem-popup elements on this page are summoned-monster / Default "
+            "Attack tooltips, not the gem itself, so the gem's tag/stat tooltip is omitted here "
+            "to avoid returning wrong data. The per-level table below is accurate; use the "
+            "full-details link for the complete gem tooltip. (Known limitation -- a structured "
+            "gem data source is planned to replace this scraping.)"
+        )
+        sections.append("")
 
     # Level Effect table
     for card in soup.select("div.card"):
