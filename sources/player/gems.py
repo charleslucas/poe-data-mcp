@@ -91,7 +91,13 @@ def search_gem(query: str) -> str:
 
 
 def get_gem_detail(gem_name: str) -> str:
-    """Get detailed information about a specific Path of Exile gem.
+    """Get detailed information about a specific Path of Exile gem (via poedb).
+
+    NOTE: Prefer pob-mcp's `get_gem_detail`, which sources gem data from Path of
+    Building's own game data (patch-current, matches the in-game tooltip, handles
+    Vaal/transfigured/support/minion variants). This poedb-scraping version is a
+    fallback for when PoB/pob-mcp is unavailable; it can mis-target summoned-monster
+    tooltips (guarded below) and lags the current patch.
 
     Args:
         gem_name: The gem name, e.g. "Fireball" or "Leap Slam".
@@ -112,7 +118,7 @@ def get_gem_detail(gem_name: str) -> str:
     # Absolution spell shown as a wand attack, and minion gems shown as their minion's default
     # attack). Guard: only render the popup when it actually looks like the gem's tooltip;
     # otherwise omit it and rely on the (correct) Level Effect table below.
-    # TODO: replace this scraping with a structured gem data source (RePoE / PoB gem data).
+    # Superseded by pob-mcp's get_gem_detail (PoB game data); this scraper is now the fallback.
     def _is_gem_tooltip(p) -> bool:
         if p is None:
             return False
