@@ -9,12 +9,27 @@ Uses two poe.ninja API endpoints:
             Response: {"lines": [{name, chaosValue, divineValue, sparkLine, listingCount}]}
 """
 
+import html
 import re
 import time
 
 import httpx
 
 from sources.common import HEADERS
+
+
+class AmbiguousLeagueError(Exception):
+    """Raised when auto-detection finds more than one non-permanent league
+    currently live (e.g. a challenge league running alongside an event
+    league) and no explicit league was given. Callers must not guess which
+    one the user means -- pass league= explicitly."""
+
+    def __init__(self, candidates: list[str]):
+        self.candidates = candidates
+        super().__init__(
+            "Multiple active leagues detected (" + ", ".join(candidates) +
+            ") -- pass league= explicitly rather than relying on auto-detection."
+        )
 
 NINJA_EXCHANGE_URL = "https://poe.ninja/poe1/api/economy/exchange/current/overview"
 NINJA_STASH_URL    = "https://poe.ninja/poe1/api/economy/stash/current/item/overview"
@@ -65,6 +80,8 @@ DEFAULT_SEARCH_ORDER = ["currency", "unique", "gem", "divcard", "map"]
 # --- Caches ---
 _league_cache: str | None = None
 _league_cache_ts: float = 0
+_league_ambiguous_cache: list[str] | None = None
+_league_ambiguous_cache_ts: float = 0
 _LEAGUE_TTL = 3600  # 1 hour
 
 # Cache keyed by (endpoint, league, type_name)
@@ -72,30 +89,63 @@ _ninja_cache: dict[tuple[str, str, str], tuple[float, list, list]] = {}
 _NINJA_TTL = 900  # 15 minutes
 
 
+def _extract_league_candidates(page_html: str) -> list[str]:
+    """Extract ordered league URL slugs from poe.ninja's homepage.
+
+    poe.ninja embeds its current league list as escaped JSON inside a
+    hydration payload (props.poe1IndexState.economyLeagues), not as plain
+    <a href> links -- e.g. {"name":"Mirage","url":"mirage",...}. Falls back
+    to a legacy anchor-scrape in case the site ever reverts.
+    """
+    text = html.unescape(page_html)
+    m = re.search(r'"economyLeagues":\[1,\[(.*?)\]\],"oldEconomyLeagues"', text)
+    if m:
+        return re.findall(r'"url":\[0,"([a-z0-9.\-]+)"\]', m.group(1))
+    return re.findall(r'/(?:economy|challenge)/([a-z][a-z0-9-]+)', text.lower())
+
+
 def _get_current_league() -> str:
-    """Auto-detect current temp league from poe.ninja homepage."""
-    global _league_cache, _league_cache_ts
+    """Auto-detect the current temp league from poe.ninja's homepage.
+
+    Raises AmbiguousLeagueError if more than one non-permanent league is
+    currently live (e.g. a challenge league running alongside a shorter
+    event league) -- do not silently guess which one the caller means.
+    """
+    global _league_cache, _league_cache_ts, _league_ambiguous_cache, _league_ambiguous_cache_ts
+
     if _league_cache and (time.time() - _league_cache_ts) < _LEAGUE_TTL:
         return _league_cache
+    if _league_ambiguous_cache and (time.time() - _league_ambiguous_cache_ts) < _LEAGUE_TTL:
+        raise AmbiguousLeagueError(_league_ambiguous_cache)
 
     permanent = {"standard", "hardcore"}
+    validated: list[str] = []
     try:
         resp = httpx.get(NINJA_HOME, headers=HEADERS, follow_redirects=True, timeout=15)
         resp.raise_for_status()
-        candidates = re.findall(r'/(?:economy|challenge)/([a-z][a-z0-9-]+)', resp.text.lower())
+        candidates = _extract_league_candidates(resp.text)
         seen = set()
         for c in candidates:
+            c = c.lower()
             if c in permanent or c in seen:
                 continue
             seen.add(c)
             league_name = c.capitalize()
             lines, _ = _fetch_exchange_raw(league_name, "Currency")
             if lines:
-                _league_cache = league_name
-                _league_cache_ts = time.time()
-                return league_name
+                validated.append(league_name)
     except Exception:
         pass
+
+    if len(validated) == 1:
+        _league_cache = validated[0]
+        _league_cache_ts = time.time()
+        return _league_cache
+    if len(validated) > 1:
+        _league_ambiguous_cache = validated
+        _league_ambiguous_cache_ts = time.time()
+        raise AmbiguousLeagueError(validated)
+
     _league_cache = "Standard"
     _league_cache_ts = time.time()
     return _league_cache
@@ -103,6 +153,22 @@ def _get_current_league() -> str:
 
 def _resolve_league(league: str) -> str:
     return league if league else _get_current_league()
+
+
+def _resolve_league_for_tool(league: str) -> tuple[str | None, str | None]:
+    """Resolve a league for an MCP tool call. Returns (resolved_league, None) on
+    success, or (None, error_message) if auto-detection is ambiguous -- callers
+    should return the error_message directly rather than guessing a league."""
+    try:
+        return _resolve_league(league), None
+    except AmbiguousLeagueError as e:
+        candidates_str = ", ".join(f'"{c}"' for c in e.candidates)
+        return None, (
+            f"Multiple leagues are currently active ({candidates_str}) and no `league` was "
+            f"specified, so I can't guess which one you mean -- likely a main challenge league "
+            f"running alongside a shorter event league. Re-call with an explicit league= from "
+            f"the list above (e.g. league={e.candidates[0]!r})."
+        )
 
 
 def _fetch_exchange_raw(league: str, type_name: str) -> tuple[list, list]:
@@ -277,7 +343,9 @@ async def price_check(query: str, league: str = "", category: str = "") -> str:
                   unique, forbiddenjewel, shrinebelt, tincture, relic, gem,
                   cluster, map, invitation, base, beast, vial.
     """
-    league = _resolve_league(league)
+    league, err = _resolve_league_for_tool(league)
+    if err:
+        return err
     results: list[dict] = []
 
     if category:
@@ -311,7 +379,9 @@ async def currency_overview(league: str = "") -> str:
     Args:
         league: League name. Defaults to current temp league (auto-detected).
     """
-    league = _resolve_league(league)
+    league, err = _resolve_league_for_tool(league)
+    if err:
+        return err
     lines, items = _fetch_exchange(league, "Currency")
 
     if not lines:
