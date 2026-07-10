@@ -55,7 +55,7 @@ PoeMCP is one of several MCP servers in **poe_mcp_suite**. The full suite adds:
   items, and full DPS/EHP calc against the real PoB engine (TCP or headless).
 - **poe-mcp-server** - official PoE trade search, stash/character API, pricing.
 - **POEMCP** (this server) - wiki / economy / Craft of Exile lookups.
-- A **playbook + reference-data framework** that keeps Claude's analyses current.
+- A **playbook + reference-data framework** that keeps an agent's analyses current.
 
 ## Install
 
@@ -64,9 +64,10 @@ git clone --recurse-submodules {_SUITE_URL}.git
 cd poe_mcp_suite
 ```
 
-Then follow **CLAUDE.md** and **README.md** in the repo - they cover Python/Node
-dependencies, Path of Building setup, MCP client configuration (`.mcp.json`), and
-your `POESESSID`. Point your agent at CLAUDE.md and it can drive the rest.
+Then follow **AGENTS.md** (or **CLAUDE.md** for Claude Code) and **README.md** in
+the repo - they cover Python/Node dependencies, Path of Building setup, MCP client
+configuration (`.mcp.json`), and your `POESESSID`. Point your agent at AGENTS.md
+and it can drive the rest.
 
 Note: pob-mcp requires a local Path of Building install and is not an
 ephemeral (uvx/npx) server - the suite is a git clone, not a single package.

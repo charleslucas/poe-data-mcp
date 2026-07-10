@@ -1,6 +1,6 @@
 # POEMCP — Tool Reference
 
-MCP server for Path of Exile wiki, economy, and game data lookups. All tools are prefixed `mcp__poemcp__` in the Claude context.
+MCP server for Path of Exile wiki, economy, and game data lookups. Depending on the MCP client, tools may appear prefixed (e.g. `mcp__poemcp__`).
 Entry point: `poemcp.server:main` (run via `uvx poemcp`, `python -m poemcp`, or the `server.py` shim).
 
 ---

@@ -10,7 +10,7 @@ Data is fetched at runtime from [poedb.tw](https://poedb.tw), [poe.ninja](https:
 
 ## Part of poe_mcp_suite
 
-This server is part of [poe_mcp_suite](https://github.com/charleslucas/poe_mcp_suite) — a collection of MCP servers for Path of Exile designed to work together with Claude. See the suite repo for an overview of all available servers and tools.
+This server is part of [poe_mcp_suite](https://github.com/charleslucas/poe_mcp_suite) — a collection of MCP servers for Path of Exile. The suite works with any MCP-compatible AI agent, and ships an analysis framework that is additionally optimized for Claude Code. See the suite repo for an overview of all available servers and tools.
 
 ---
 
@@ -19,7 +19,7 @@ This server is part of [poe_mcp_suite](https://github.com/charleslucas/poe_mcp_s
 ### Requirements
 
 - Python 3.10+
-- [Claude Desktop](https://claude.ai/download) or Claude Code (CLI)
+- An MCP-compatible client — e.g. [Claude Desktop](https://claude.ai/download) / Claude Code, Cursor, Windsurf, Cline, VS Code, or Zed
 - Internet access (all data is fetched at runtime)
 
 ### Quick install (recommended) — no clone, no manual setup
@@ -52,14 +52,14 @@ pip install -e .
 
 You can then launch it via the `poemcp` command, `python -m poemcp`, or `python server.py`.
 
-> **💡 Not sure how to configure Claude?**
-> Ask Claude directly:
-> *"Guide me step by step to add a local MCP server called PoeMCP to my Claude config. The command is `python` and the argument is the full path to `server.py` in the POEMCP folder I cloned."*
-> Claude will walk you through finding the config file and adding the correct JSON block for your OS.
+> **💡 Not sure how to configure your client?**
+> Ask your AI assistant directly:
+> *"Guide me step by step to add a local MCP server called PoeMCP to my MCP client config. The command is `python` and the argument is the full path to `server.py` in the POEMCP folder I cloned."*
+> It will walk you through finding the config file and adding the correct JSON block for your OS.
 
 ## MCP Configuration
 
-Add the following to your Claude config, replacing the path with the directory where you cloned the repo. For a step-by-step visual walkthrough, see **installation and out put example in** [examples.md](examples.md).
+The `mcpServers` block below is the same shape used by most MCP clients (Claude Desktop/Code, Cursor, Windsurf, Cline, VS Code, Zed…) — only the config file location differs. Replace the path with the directory where you cloned the repo. For a step-by-step visual walkthrough, see [examples.md](examples.md).
 
 ### Claude Desktop
 
