@@ -1,7 +1,8 @@
 """Craft of Exile data cache and crafting lookup tools.
 
 Downloads JSON data from craftofexile.com on first use and caches it locally in
-reference_data/craftofexile/ (gitignored — each user fetches their own copy).
+the platform user-cache dir (see ``_default_cache_dir``; overridable via
+``POEMCP_CACHE_DIR``). Each user fetches their own copy — nothing is redistributed.
 
 Freshness: the homepage embeds ?v=<unix_timestamp> on every data file URL.
 We compare stored timestamps against the current homepage on each process start
@@ -9,6 +10,7 @@ We compare stored timestamps against the current homepage on each process start
 """
 
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -17,7 +19,32 @@ from typing import Any
 import httpx
 
 SITE = "https://www.craftofexile.com"
-CACHE_DIR = Path(__file__).parents[3] / "reference_data" / "craftofexile"
+
+
+def _default_cache_dir() -> Path:
+    """Where to cache craftofexile data.
+
+    A single canonical location is shared by every install method — a standalone
+    ``uvx``/``pipx`` install and the full poe_mcp_suite both land here, so the
+    cache is built once and reused regardless of how PoeMCP was installed:
+
+    1. ``POEMCP_CACHE_DIR`` env var, if set (optional override for advanced use).
+    2. The platform user-cache dir (the default), e.g.
+       ``%LOCALAPPDATA%\\poemcp\\Cache`` on Windows or ``~/.cache/poemcp``
+       elsewhere.
+    """
+    env = os.environ.get("POEMCP_CACHE_DIR")
+    if env:
+        return Path(env).expanduser()
+    try:
+        from platformdirs import user_cache_dir
+
+        return Path(user_cache_dir("poemcp", appauthor=False)) / "craftofexile"
+    except Exception:
+        return Path.home() / ".cache" / "poemcp" / "craftofexile"
+
+
+CACHE_DIR = _default_cache_dir()
 MANIFEST_FILE = CACHE_DIR / "manifest.json"
 
 # Only re-check the homepage for version updates this often (12 hours)

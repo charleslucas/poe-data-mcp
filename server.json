@@ -1,0 +1,30 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.charleslucas/poemcp",
+  "title": "PoeMCP — Path of Exile game data",
+  "description": "MCP server for Path of Exile game data: wiki, economy, and Craft of Exile lookups (gems, uniques, passives, mods, maps, scarabs, prices, and PoB parsing).",
+  "repository": {
+    "url": "https://github.com/charleslucas/POEMCP",
+    "source": "github"
+  },
+  "version": "0.1.1",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "poemcp",
+      "version": "0.1.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "POEMCP_CACHE_DIR",
+          "description": "Directory for the Craft of Exile data cache. Defaults to the platform user-cache dir (e.g. %LOCALAPPDATA%/poemcp on Windows, ~/.cache/poemcp elsewhere).",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

@@ -3,7 +3,32 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
+
+
+def _ytdlp_cmd() -> list[str] | None:
+    """Return the base command for invoking yt-dlp, or None if unavailable.
+
+    Prefers ``python -m yt_dlp`` so the dependency declared in pyproject is used
+    even under isolated runners (uvx/pipx) where the console script may not be on
+    PATH; falls back to a ``yt-dlp`` binary on PATH.
+    """
+    try:
+        import yt_dlp  # noqa: F401
+
+        return [sys.executable, "-m", "yt_dlp"]
+    except Exception:
+        pass
+    if shutil.which("yt-dlp") is not None:
+        return ["yt-dlp"]
+    return None
+
+
+_YTDLP_MISSING = (
+    "yt-dlp is not installed. Install it with: pip install yt-dlp\n"
+    "Alternatively, paste the video description/transcript text directly."
+)
 
 # Links worth extracting from a build guide description
 _LINK_PATTERNS = {
@@ -26,19 +51,17 @@ def fetch_youtube_description(url: str) -> str:
     Args:
         url: YouTube video URL (e.g. https://www.youtube.com/watch?v=...)
     """
-    if shutil.which("yt-dlp") is None:
-        return (
-            "yt-dlp is not installed. Install it with: pip install yt-dlp\n"
-            "Alternatively, paste the video description text directly."
-        )
+    ytdlp = _ytdlp_cmd()
+    if ytdlp is None:
+        return _YTDLP_MISSING
 
     try:
         title_result = subprocess.run(
-            ["yt-dlp", "--get-title", "--force-ipv4", "--socket-timeout", "20", "--no-warnings", url],
+            [*ytdlp, "--get-title", "--force-ipv4", "--socket-timeout", "20", "--no-warnings", url],
             capture_output=True, text=True, timeout=30
         )
         desc_result = subprocess.run(
-            ["yt-dlp", "--get-description", "--force-ipv4", "--socket-timeout", "20", "--no-warnings", url],
+            [*ytdlp, "--get-description", "--force-ipv4", "--socket-timeout", "20", "--no-warnings", url],
             capture_output=True, text=True, timeout=30
         )
     except subprocess.TimeoutExpired:
@@ -93,20 +116,18 @@ def fetch_youtube_transcript(url: str, include_timestamps: bool = False) -> str:
         include_timestamps: If True, include time markers (MM:SS) inline.
                             Default False returns clean readable prose.
     """
-    if shutil.which("yt-dlp") is None:
-        return (
-            "yt-dlp is not installed. Install it with: pip install yt-dlp\n"
-            "Alternatively, use the YouTube transcript feature in your browser."
-        )
+    ytdlp = _ytdlp_cmd()
+    if ytdlp is None:
+        return _YTDLP_MISSING
 
     # Get title and chapter list from description first (lightweight)
     try:
         title_result = subprocess.run(
-            ["yt-dlp", "--get-title", "--force-ipv4", "--socket-timeout", "20", "--no-warnings", url],
+            [*ytdlp, "--get-title", "--force-ipv4", "--socket-timeout", "20", "--no-warnings", url],
             capture_output=True, text=True, timeout=15
         )
         desc_result = subprocess.run(
-            ["yt-dlp", "--get-description", "--force-ipv4", "--socket-timeout", "20", "--no-warnings", url],
+            [*ytdlp, "--get-description", "--force-ipv4", "--socket-timeout", "20", "--no-warnings", url],
             capture_output=True, text=True, timeout=15
         )
         title = title_result.stdout.strip()
@@ -127,7 +148,7 @@ def fetch_youtube_transcript(url: str, include_timestamps: bool = False) -> str:
         # wrapper timeout on an intermittently stalled timedtext download.
         try:
             result = subprocess.run(
-                ["yt-dlp", "--write-auto-subs", "--sub-lang", "en",
+                [*ytdlp, "--write-auto-subs", "--sub-lang", "en",
                  "--sub-format", "json3", "--skip-download", "--no-warnings",
                  "--force-ipv4", "--socket-timeout", "20", "--retries", "3",
                  "-o", out_path, url],

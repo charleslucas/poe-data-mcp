@@ -3,7 +3,7 @@ import re
 import httpx
 from bs4 import BeautifulSoup
 
-from sources.common import HEADERS
+from poemcp.sources.common import HEADERS
 
 # Sections worth extracting from poewiki.net pages
 _USEFUL_SECTIONS = {

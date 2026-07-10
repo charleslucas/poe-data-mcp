@@ -1,6 +1,6 @@
 import httpx
 
-from sources.common import HEADERS, Cache
+from poemcp.sources.common import HEADERS, Cache
 
 _tree_cache = Cache()
 

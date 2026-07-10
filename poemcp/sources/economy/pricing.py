@@ -15,7 +15,7 @@ import time
 
 import httpx
 
-from sources.common import HEADERS
+from poemcp.sources.common import HEADERS
 
 
 class AmbiguousLeagueError(Exception):

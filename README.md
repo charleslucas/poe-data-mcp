@@ -1,5 +1,7 @@
 # PoeMCP
 
+<!-- mcp-name: io.github.charleslucas/poemcp -->
+
 > **This product is not affiliated with or endorsed by Grinding Gear Games in any way.**
 
 An MCP server that gives any LLM access to Path of Exile game data — gems, unique items, passive tree nodes, item modifiers, maps, scarabs, live pricing, and Path of Building build parsing.
@@ -20,17 +22,35 @@ This server is part of [poe_mcp_suite](https://github.com/charleslucas/poe_mcp_s
 - [Claude Desktop](https://claude.ai/download) or Claude Code (CLI)
 - Internet access (all data is fetched at runtime)
 
-### Steps
+### Quick install (recommended) — no clone, no manual setup
+
+PoeMCP is published to PyPI, so an ephemeral runner like [`uvx`](https://github.com/astral-sh/uv) or `pipx` can fetch and run it on demand — nothing to clone or keep updated. Add this to your MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "poemcp": {
+      "command": "uvx",
+      "args": ["poemcp"]
+    }
+  }
+}
+```
+
+The Craft of Exile cache is stored in your platform user-cache dir (e.g. `%LOCALAPPDATA%\poemcp\Cache` on Windows, `~/.cache/poemcp` elsewhere); override with the `POEMCP_CACHE_DIR` env var. The optional `fetch_youtube_*` tools use the bundled `yt-dlp`.
+
+### From source
 
 > **⚠️ Python 3.10+ is required.** PoeMCP will not work without it.
 > Download from [python.org](https://www.python.org/downloads/) if you don't have it.
-> After installing, verify by running `python --version` in your terminal.
 
 ```bash
-git clone https://github.com/shalayiding/POEMCP.git
+git clone https://github.com/charleslucas/POEMCP.git
 cd POEMCP
 pip install -e .
 ```
+
+You can then launch it via the `poemcp` command, `python -m poemcp`, or `python server.py`.
 
 > **💡 Not sure how to configure Claude?**
 > Ask Claude directly:

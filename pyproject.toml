@@ -4,21 +4,32 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "poemcp"
-version = "0.1.0"
-description = "MCP server for Path of Exile game data"
+version = "0.1.1"
+description = "MCP server for Path of Exile game data - wiki, economy, and Craft of Exile lookups"
 readme = "README.md"
 requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Charles Lucas", email = "zerosquaredio@gmail.com" }]
+keywords = ["mcp", "path-of-exile", "poe", "model-context-protocol"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
 dependencies = [
     "mcp[cli]",
     "httpx",
     "beautifulsoup4",
+    "platformdirs>=3",
+    "yt-dlp",
 ]
 
+[project.urls]
+Homepage = "https://github.com/charleslucas/POEMCP"
+Repository = "https://github.com/charleslucas/POEMCP"
+
 [project.scripts]
-poemcp = "server:main"
+poemcp = "poemcp.server:main"
 
 [tool.setuptools.packages.find]
-include = ["sources*"]
-
-[tool.setuptools]
-py-modules = ["server"]
+include = ["poemcp*"]
