@@ -1,6 +1,6 @@
-# PoeMCP
+# poe-data-mcp
 
-<!-- mcp-name: io.github.charleslucas/poemcp -->
+<!-- mcp-name: io.github.charleslucas/poe-data-mcp -->
 
 > **This product is not affiliated with or endorsed by Grinding Gear Games in any way.**
 
@@ -24,37 +24,37 @@ This server is part of [poe_mcp_suite](https://github.com/charleslucas/poe_mcp_s
 
 ### Quick install (recommended) — no clone, no manual setup
 
-PoeMCP is published to PyPI, so an ephemeral runner like [`uvx`](https://github.com/astral-sh/uv) or `pipx` can fetch and run it on demand — nothing to clone or keep updated. Add this to your MCP client config:
+poe-data-mcp is published to PyPI, so an ephemeral runner like [`uvx`](https://github.com/astral-sh/uv) or `pipx` can fetch and run it on demand — nothing to clone or keep updated. Add this to your MCP client config:
 
 ```json
 {
   "mcpServers": {
-    "poemcp": {
+    "poe-data-mcp": {
       "command": "uvx",
-      "args": ["poemcp"]
+      "args": ["poe-data-mcp"]
     }
   }
 }
 ```
 
-The Craft of Exile cache is stored in your platform user-cache dir (e.g. `%LOCALAPPDATA%\poemcp\Cache` on Windows, `~/.cache/poemcp` elsewhere); override with the `POEMCP_CACHE_DIR` env var. The optional `fetch_youtube_*` tools use the bundled `yt-dlp`.
+The Craft of Exile cache is stored in your platform user-cache dir (e.g. `%LOCALAPPDATA%\poe-data-mcp\Cache` on Windows, `~/.cache/poe-data-mcp` elsewhere); override with the `POE_DATA_MCP_CACHE_DIR` env var. The optional `fetch_youtube_*` tools use the bundled `yt-dlp`.
 
 ### From source
 
-> **⚠️ Python 3.10+ is required.** PoeMCP will not work without it.
+> **⚠️ Python 3.10+ is required.** poe-data-mcp will not work without it.
 > Download from [python.org](https://www.python.org/downloads/) if you don't have it.
 
 ```bash
-git clone https://github.com/charleslucas/POEMCP.git
-cd POEMCP
+git clone https://github.com/charleslucas/poe-data-mcp.git
+cd poe-data-mcp
 pip install -e .
 ```
 
-You can then launch it via the `poemcp` command, `python -m poemcp`, or `python server.py`.
+You can then launch it via the `poe-data-mcp` command, `python -m poe_data_mcp`, or `python server.py`.
 
 > **💡 Not sure how to configure your client?**
 > Ask your AI assistant directly:
-> *"Guide me step by step to add a local MCP server called PoeMCP to my MCP client config. The command is `python` and the argument is the full path to `server.py` in the POEMCP folder I cloned."*
+> *"Guide me step by step to add a local MCP server called poe-data-mcp to my MCP client config. The command is `python` and the argument is the full path to `server.py` in the poe-data-mcp folder I cloned."*
 > It will walk you through finding the config file and adding the correct JSON block for your OS.
 
 ## MCP Configuration
@@ -73,9 +73,9 @@ File location:
 ```json
 {
   "mcpServers": {
-    "poemcp": {
+    "poe-data-mcp": {
       "command": "python",
-      "args": ["/path/to/PoeMCP/server.py"]
+      "args": ["/path/to/poe-data-mcp/server.py"]
     }
   }
 }
@@ -86,9 +86,9 @@ File location:
 ```json
 {
   "mcpServers": {
-    "poemcp": {
+    "poe-data-mcp": {
       "command": "python",
-      "args": ["C:\\path\\to\\PoeMCP\\server.py"]
+      "args": ["C:\\path\\to\\poe-data-mcp\\server.py"]
     }
   }
 }

@@ -46,21 +46,21 @@ jobs:
       - name: Wait for PyPI to index the release
         run: |
           for i in $(seq 1 30); do
-            if curl -fsS "https://pypi.org/pypi/poemcp/${VERSION}/json" > /dev/null; then
-              echo "poemcp ${VERSION} is available on PyPI."
+            if curl -fsS "https://pypi.org/pypi/poe-data-mcp/${VERSION}/json" > /dev/null; then
+              echo "poe-data-mcp ${VERSION} is available on PyPI."
               exit 0
             fi
             echo "Not indexed yet (attempt $i)… waiting 10s"
             sleep 10
           done
-          echo "Timed out waiting for PyPI to index poemcp ${VERSION}" >&2
+          echo "Timed out waiting for PyPI to index poe-data-mcp ${VERSION}" >&2
           exit 1
 
       - name: Install mcp-publisher
         run: |
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
 
-      # OIDC auth: the workflow runs in charleslucas/POEMCP, so the registry
+      # OIDC auth: the workflow runs in charleslucas/poe-data-mcp, so the registry
       # authorizes the io.github.charleslucas/* namespace with no stored secret.
       - name: Authenticate to MCP Registry
         run: ./mcp-publisher login github-oidc

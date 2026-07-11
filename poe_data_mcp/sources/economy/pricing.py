@@ -15,7 +15,7 @@ import time
 
 import httpx
 
-from poemcp.sources.common import HEADERS
+from poe_data_mcp.sources.common import HEADERS
 
 
 class AmbiguousLeagueError(Exception):

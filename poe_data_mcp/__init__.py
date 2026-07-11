@@ -3,6 +3,6 @@
 Part of poe_mcp_suite (https://github.com/charleslucas/poe_mcp_suite).
 """
 
-from poemcp.server import main, mcp
+from poe_data_mcp.server import main, mcp
 
 __all__ = ["main", "mcp"]

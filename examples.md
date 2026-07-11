@@ -1,4 +1,4 @@
-# PoeMCP — Examples
+# poe-data-mcp — Examples
 
 - [Setup](#setup)
   - [Claude Desktop](#claude-desktop)
@@ -21,8 +21,8 @@
 1. Clone the repo and install:
 
 ```bash
-git clone https://github.com/shalayiding/POEMCP.git
-cd PoeMCP
+git clone https://github.com/shalayiding/poe-data-mcp.git
+cd poe-data-mcp
 pip install -e .
 ```
 
@@ -43,9 +43,9 @@ pip install -e .
 ```json
 {
   "mcpServers": {
-    "poemcp": {
+    "poe-data-mcp": {
       "command": "python",
-      "args": ["/path/to/PoeMCP/server.py"]
+      "args": ["/path/to/poe-data-mcp/server.py"]
     }
   }
 }
@@ -56,15 +56,15 @@ pip install -e .
 ```json
 {
   "mcpServers": {
-    "poemcp": {
+    "poe-data-mcp": {
       "command": "python",
-      "args": ["C:\\path\\to\\PoeMCP\\server.py"]
+      "args": ["C:\\path\\to\\poe-data-mcp\\server.py"]
     }
   }
 }
 ```
 
-4. Restart Claude Desktop. You should see the PoeMCP tools available in the tool panel.
+4. Restart Claude Desktop. You should see the poe-data-mcp tools available in the tool panel.
 
 ---
 
@@ -75,9 +75,9 @@ Add to your project's `.mcp.json`:
 ```json
 {
   "mcpServers": {
-    "poemcp": {
+    "poe-data-mcp": {
       "command": "python",
-      "args": ["/path/to/PoeMCP/server.py"]
+      "args": ["/path/to/poe-data-mcp/server.py"]
     }
   }
 }

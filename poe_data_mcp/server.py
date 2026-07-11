@@ -1,10 +1,10 @@
 from mcp.server.fastmcp import FastMCP
 
-from poemcp.sources.player.gems import get_gem_detail, search_gem
-from poemcp.sources.player.items import get_item_detail, search_item
-from poemcp.sources.player.passives import get_passive_detail, search_passive
-from poemcp.sources.mods.item_mods import search_mods
-from poemcp.sources.crafting.craftofexile import (
+from poe_data_mcp.sources.player.gems import get_gem_detail, search_gem
+from poe_data_mcp.sources.player.items import get_item_detail, search_item
+from poe_data_mcp.sources.player.passives import get_passive_detail, search_passive
+from poe_data_mcp.sources.mods.item_mods import search_mods
+from poe_data_mcp.sources.crafting.craftofexile import (
     craftofexile_cache_status,
     update_craftofexile_cache,
     search_craft_mods,
@@ -13,17 +13,17 @@ from poemcp.sources.crafting.craftofexile import (
     get_fossil_info,
     get_essence_mods,
 )
-from poemcp.sources.env import env_detail, env_search
-from poemcp.sources.economy import currency_overview, price_check
-from poemcp.sources.wiki import fetch_wiki_page
-from poemcp.sources.player.pob import parse_pob
-from poemcp.sources.youtube import fetch_youtube_description, fetch_youtube_transcript
-from poemcp.sources.reddit import fetch_reddit_post
+from poe_data_mcp.sources.env import env_detail, env_search
+from poe_data_mcp.sources.economy import currency_overview, price_check
+from poe_data_mcp.sources.wiki import fetch_wiki_page
+from poe_data_mcp.sources.player.pob import parse_pob
+from poe_data_mcp.sources.youtube import fetch_youtube_description, fetch_youtube_transcript
+from poe_data_mcp.sources.reddit import fetch_reddit_post
 
 _SUITE_URL = "https://github.com/charleslucas/poe_mcp_suite"
 
 _INSTRUCTIONS = f"""\
-PoeMCP provides Path of Exile game-data lookups - wiki, gems, unique items, \
+poe-data-mcp provides Path of Exile game-data lookups - wiki, gems, unique items, \
 passive nodes, item mods, maps, scarabs, live prices, Craft of Exile mod pools, \
 and Path of Building export parsing. No API key required.
 
@@ -36,25 +36,25 @@ tell them the full suite exists and offer to help install it. Call the \
 `poe_mcp_suite_info` tool for current install steps and the repo URL.
 """
 
-mcp = FastMCP("PoeMCP", instructions=_INSTRUCTIONS)
+mcp = FastMCP("poe-data-mcp", instructions=_INSTRUCTIONS)
 
 
 def poe_mcp_suite_info() -> str:
     """Install instructions and overview for the full poe_mcp_suite.
 
-    PoeMCP (this server) is the game-data lookup component of a larger suite.
+    poe-data-mcp (this server) is the game-data lookup component of a larger suite.
     Call this when the user wants deeper Path of Exile build analysis than
     lookups provide, or asks about the full suite / Path of Building integration.
     """
     return f"""\
 # poe_mcp_suite
 
-PoeMCP is one of several MCP servers in **poe_mcp_suite**. The full suite adds:
+poe-data-mcp is one of several MCP servers in **poe_mcp_suite**. The full suite adds:
 
 - **pob-mcp** - live Path of Building integration: simulate passive trees, gems,
   items, and full DPS/EHP calc against the real PoB engine (TCP or headless).
-- **poe-mcp-server** - official PoE trade search, stash/character API, pricing.
-- **POEMCP** (this server) - wiki / economy / Craft of Exile lookups.
+- **poe-trade-mcp** - official PoE trade search, stash/character API, pricing.
+- **poe-data-mcp** (this server) - wiki / economy / Craft of Exile lookups.
 - A **playbook + reference-data framework** that keeps an agent's analyses current.
 
 ## Install

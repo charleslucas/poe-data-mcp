@@ -1,7 +1,7 @@
-# POEMCP — Tool Reference
+# poe-data-mcp — Tool Reference
 
-MCP server for Path of Exile wiki, economy, and game data lookups. Depending on the MCP client, tools may appear prefixed (e.g. `mcp__poemcp__`).
-Entry point: `poemcp.server:main` (run via `uvx poemcp`, `python -m poemcp`, or the `server.py` shim).
+MCP server for Path of Exile wiki, economy, and game data lookups. Depending on the MCP client, tools may appear prefixed (e.g. `mcp__poe-data-mcp__`).
+Entry point: `poe_data_mcp.server:main` (run via `uvx poe-data-mcp`, `python -m poe_data_mcp`, or the `server.py` shim).
 
 ---
 

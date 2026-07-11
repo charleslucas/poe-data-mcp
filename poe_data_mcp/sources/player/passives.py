@@ -1,6 +1,6 @@
 import httpx
 
-from poemcp.sources.common import HEADERS, Cache
+from poe_data_mcp.sources.common import HEADERS, Cache
 
 _tree_cache = Cache()
 

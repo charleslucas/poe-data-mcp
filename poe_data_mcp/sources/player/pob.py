@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 
 import httpx
 
-from poemcp.sources.common import HEADERS
+from poe_data_mcp.sources.common import HEADERS
 
 # Stats worth showing in the summary
 _KEY_STATS = {
@@ -411,7 +411,7 @@ def _parse_passives(root: ET.Element) -> dict:
     total = len(allocated_ids)
 
     try:
-        from poemcp.sources.player.passives import _load_tree
+        from poe_data_mcp.sources.player.passives import _load_tree
         by_id = _load_tree()["by_id"]
         keystones, notables = [], []
         for nid in allocated_ids:

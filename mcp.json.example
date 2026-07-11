@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "poemcp": {
+    "poe-data-mcp": {
       "command": "python",
-      "args": ["/path/to/PoeMCP/server.py"]
+      "args": ["/path/to/poe-data-mcp/server.py"]
     }
   }
 }

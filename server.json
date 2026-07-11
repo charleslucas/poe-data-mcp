@@ -1,25 +1,25 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.charleslucas/poemcp",
-  "title": "PoeMCP - Path of Exile game data",
+  "name": "io.github.charleslucas/poe-data-mcp",
+  "title": "poe-data-mcp - Path of Exile game data",
   "description": "MCP server for Path of Exile game data: wiki, economy, and Craft of Exile lookups",
   "repository": {
-    "url": "https://github.com/charleslucas/POEMCP",
+    "url": "https://github.com/charleslucas/poe-data-mcp",
     "source": "github"
   },
-  "version": "0.1.1",
+  "version": "0.2.0",
   "packages": [
     {
       "registryType": "pypi",
-      "identifier": "poemcp",
-      "version": "0.1.1",
+      "identifier": "poe-data-mcp",
+      "version": "0.2.0",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
         {
-          "name": "POEMCP_CACHE_DIR",
-          "description": "Directory for the Craft of Exile data cache. Defaults to the platform user-cache dir (e.g. %LOCALAPPDATA%/poemcp on Windows, ~/.cache/poemcp elsewhere).",
+          "name": "POE_DATA_MCP_CACHE_DIR",
+          "description": "Directory for the Craft of Exile data cache. Defaults to the platform user-cache dir (e.g. %LOCALAPPDATA%/poe-data-mcp on Windows, ~/.cache/poe-data-mcp elsewhere).",
           "isRequired": false,
           "isSecret": false,
           "format": "string"

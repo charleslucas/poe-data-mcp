@@ -1,6 +1,6 @@
 import httpx
 
-from poemcp.sources.common import BASE_URL, Cache, fetch_page
+from poe_data_mcp.sources.common import BASE_URL, Cache, fetch_page
 
 _gem_cache = Cache()
 

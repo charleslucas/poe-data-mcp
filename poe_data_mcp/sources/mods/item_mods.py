@@ -6,7 +6,7 @@ import time
 
 import httpx
 
-from poemcp.sources.common import BASE_URL, CACHE_TTL, HEADERS
+from poe_data_mcp.sources.common import BASE_URL, CACHE_TTL, HEADERS
 
 # ---------------------------------------------------------------------------
 # Slug mapping — friendly name → poedb URL slug
