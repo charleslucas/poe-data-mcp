@@ -4,6 +4,9 @@ name: Publish to PyPI and MCP Registry
 #   git tag v0.1.1 && git push origin v0.1.1
 # The tag (minus the leading "v") becomes the version for BOTH the PyPI package
 # and the MCP registry entry, so they can never drift.
+#
+# Before tagging: move the accumulated CHANGELOG.md [Unreleased] entries into a
+# new "## [x.y.z] - YYYY-MM-DD" section — it becomes the GitHub Release notes.
 
 on:
   push:
@@ -14,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write   # OIDC — used for BOTH PyPI trusted publishing and the MCP registry
-      contents: read
+      contents: write   # create the GitHub Release from the changelog
 
     steps:
       - name: Checkout
@@ -67,3 +70,20 @@ jobs:
 
       - name: Publish to MCP Registry
         run: ./mcp-publisher publish
+
+      # Turn this version's CHANGELOG.md section into the GitHub Release notes.
+      # Runs last so a notes hiccup can't block the actual PyPI/registry publish.
+      - name: Create GitHub Release from CHANGELOG
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Literal matching (no regex) — extract this version's section, stopping
+          # at the next "## [" header or the "[x.y.z]: <url>" reference footer.
+          NOTES=$(awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { flag=1; next }
+            substr($0,1,4) == "## [" { flag=0 }
+            substr($0,1,1) == "[" && index($0, "]:") > 0 { flag=0 }
+            flag { print }
+          ' CHANGELOG.md)
+          [ -z "$(echo "$NOTES" | tr -d '[:space:]')" ] && NOTES="Release v${VERSION}"
+          gh release create "v${VERSION}" --title "v${VERSION}" --notes "$NOTES"
