@@ -1,4 +1,5 @@
 import base64
+import json
 import zlib
 import xml.etree.ElementTree as ET
 
@@ -634,3 +635,122 @@ def parse_pob(code_or_url: str) -> str:
         lines.append("")
 
     return "\n".join(lines)
+
+
+def _is_support(gem: ET.Element) -> bool:
+    """A gem is a support if its skillId/gemId marks it as one."""
+    return gem.get("skillId", "").startswith("Support") or "SupportGem" in gem.get("gemId", "")
+
+
+def _skill_groups_for_set(sset: ET.Element) -> list[dict]:
+    """Structured socket/link groups for one <SkillSet> (or <Skills>) element."""
+    groups = []
+    for skill in sset.findall("Skill"):
+        try:
+            main_idx = int(skill.get("mainActiveSkill", "1")) - 1
+        except ValueError:
+            main_idx = 0
+        gems = []
+        for i, gem in enumerate(skill.findall("Gem")):
+            name = gem.get("nameSpec") or gem.get("skillId", "")
+            if not name:
+                continue
+            gems.append({
+                "name": name,
+                "skillId": gem.get("skillId", ""),
+                "level": gem.get("level", ""),
+                "quality": gem.get("quality", "0"),
+                "support": _is_support(gem),
+                "enabled": gem.get("enabled", "true").lower() != "false",
+                "is_main": i == main_idx,
+            })
+        if not gems:
+            continue
+        groups.append({
+            "slot": skill.get("slot") or None,
+            "label": _strip_pob_colors(skill.get("label", "")).strip(),
+            "enabled": skill.get("enabled", "true").lower() != "false",
+            "gem_count": len(gems),
+            "gems": gems,
+        })
+    return groups
+
+
+def parse_pob_skill_groups(code_or_url: str, skill_set: str = "") -> str:
+    """Extract the structured socket/link groups from a PoB build, per skill set.
+
+    Unlike parse_pob (which summarises only the active set as prose), this returns
+    JSON: every link group with its gems (name, skillId, level, quality, support
+    flag, main-skill flag) and its item `slot` binding when the author set one.
+    Groups WITHOUT a slot are item-agnostic — the link group is the unit, and any
+    gear with the right links/colours can host it. A build can have many skill sets
+    (per act / progression stage); pick one with `skill_set` (id or title
+    substring, e.g. "Early Covenant"), otherwise the active set is returned. The
+    top-level `skill_sets` index always lists every set so you can pick another.
+
+    Colours are intentionally NOT included — a gem's colour is static game data;
+    look it up per gem from its attribute requirements via pob-mcp's get_gem_detail
+    (read at a mid/high level; low levels omit the requirement). Note: item-granted
+    supports (e.g. The Hungry Loop) appear as gems and inflate gem_count even though
+    the item has only one real socket.
+
+    Args:
+        code_or_url: PoB export code, pobb.in / poedb.tw / pastebin URL.
+        skill_set: Optional — a skill-set id or title substring to return groups
+            for. Omit to get the active set.
+    """
+    code = code_or_url.strip()
+    if code.startswith("http"):
+        try:
+            code = _fetch_raw(code)
+        except httpx.HTTPStatusError as e:
+            return json.dumps({"error": f"HTTP {e.response.status_code} from {e.request.url}"})
+        except Exception as e:
+            return json.dumps({"error": f"Failed to fetch PoB data: {e}"})
+
+    try:
+        root = _decode_pob(code)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+    build = _parse_build_info(root)
+    skills_el = root.find("Skills")
+    if skills_el is None:
+        return json.dumps({"error": "No <Skills> section in this build."})
+
+    sets = skills_el.findall("SkillSet")
+    active_id = skills_el.get("activeSkillSet", "1")
+
+    if not sets:
+        # Older single-set format: <Skill> directly under <Skills>.
+        index = [{"id": "1", "title": "(default)", "active": True}]
+        showing, groups = "(default)", _skill_groups_for_set(skills_el)
+    else:
+        index = [{
+            "id": s.get("id", ""),
+            "title": _clean_title(s.get("title", "")),
+            "active": s.get("id") == active_id,
+        } for s in sets]
+
+        target = None
+        if skill_set:
+            q = skill_set.strip().lower()
+            target = next(
+                (s for s in sets
+                 if s.get("id") == skill_set.strip()
+                 or q in _clean_title(s.get("title", "")).lower()),
+                None,
+            )
+        if target is None:
+            target = next((s for s in sets if s.get("id") == active_id), sets[0])
+        showing, groups = _clean_title(target.get("title", "")), _skill_groups_for_set(target)
+
+    return json.dumps({
+        "class": build.get("class"),
+        "ascendancy": build.get("ascendancy"),
+        "level": build.get("level"),
+        "active_skill_set": active_id,
+        "skill_sets": index,
+        "showing": showing,
+        "groups": groups,
+    }, indent=2)

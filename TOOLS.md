@@ -76,6 +76,7 @@ Data is downloaded from craftofexile.com on first use and cached locally (gitign
 | Tool | Description |
 |------|-------------|
 | `parse_pob` | Parse a PoB export code or share URL (pobb.in / pastebin) and return a build summary |
+| `parse_pob_skill_groups` | Structured socket/link groups per skill set from a PoB code/link (gems, support flags, item slot bindings) — for gem-to-socket / required-colour reconstruction. Colours via get_gem_detail |
 
 ---
 

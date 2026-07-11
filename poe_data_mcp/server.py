@@ -16,7 +16,7 @@ from poe_data_mcp.sources.crafting.craftofexile import (
 from poe_data_mcp.sources.env import env_detail, env_search
 from poe_data_mcp.sources.economy import currency_overview, price_check
 from poe_data_mcp.sources.wiki import fetch_wiki_page
-from poe_data_mcp.sources.player.pob import parse_pob
+from poe_data_mcp.sources.player.pob import parse_pob, parse_pob_skill_groups
 from poe_data_mcp.sources.youtube import fetch_youtube_description, fetch_youtube_transcript
 from poe_data_mcp.sources.reddit import fetch_reddit_post
 
@@ -107,6 +107,7 @@ mcp.tool()(fetch_wiki_page)
 
 # --- PoB ---
 mcp.tool()(parse_pob)
+mcp.tool()(parse_pob_skill_groups)
 
 # --- YouTube ---
 mcp.tool()(fetch_youtube_description)
