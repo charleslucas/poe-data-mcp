@@ -12,6 +12,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-11
+
+### Added
+- **`parse_pob_skill_groups`** — extract the structured socket/link groups from a
+  PoB export code or share URL (pobb.in / poedb.tw / pastebin), per skill set.
+  Returns JSON: every link group with its gems (name, skillId, level, quality,
+  support and main-skill flags), `gem_count`, and the item `slot` binding when the
+  author set one (unassigned groups are item-agnostic — the link group is the unit).
+  For slot-bound groups it also returns `item_sockets`: the item's **actual** socket
+  colour layout (e.g. `B-G-R-B-B-B`), read straight from the export. Complements
+  `parse_pob` (prose summary of only the active set) for gem-to-socket / required-
+  colour reconstruction; derive per-gem colours via pob-mcp's `get_gem_detail`.
+
 ## [0.2.0] - 2026-07-11
 
 ### Changed
@@ -42,6 +55,7 @@ _Published under the original name `poemcp` (now deprecated; superseded by 0.2.0
 - Craft of Exile cache resolves to a shared platform user-cache dir, overridable
   via an environment variable.
 
-[Unreleased]: https://github.com/charleslucas/poe-data-mcp/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/charleslucas/poe-data-mcp/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/charleslucas/poe-data-mcp/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/charleslucas/poe-data-mcp/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/charleslucas/poe-data-mcp/releases/tag/v0.1.1
