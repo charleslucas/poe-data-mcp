@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.charleslucas/poemcp",
   "title": "PoeMCP — Path of Exile game data",
-  "description": "MCP server for Path of Exile game data: wiki, economy, and Craft of Exile lookups (gems, uniques, passives, mods, maps, scarabs, prices, and PoB parsing).",
+  "description": "MCP server for Path of Exile game data: wiki, economy, and Craft of Exile lookups",
   "repository": {
     "url": "https://github.com/charleslucas/POEMCP",
     "source": "github"
