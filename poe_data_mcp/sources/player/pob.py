@@ -676,6 +676,43 @@ def _skill_groups_for_set(sset: ET.Element) -> list[dict]:
     return groups
 
 
+def _sockets_line(item_text: str) -> str:
+    """Extract the 'Sockets:' colour layout from a PoB item text block (e.g. 'B-B-R G')."""
+    for line in item_text.splitlines():
+        line = line.strip()
+        if line.startswith("Sockets:"):
+            return line.removeprefix("Sockets:").strip()
+    return ""
+
+
+def _itemset_slot_sockets(root: ET.Element, stage_idx: int | None) -> dict:
+    """Map slot name -> the item's actual socket-colour layout, for the ItemSet that
+    matches the given progression-stage index (falls back to the active/first set).
+    The item's real colours are stored in the export; this surfaces them per slot."""
+    items_el = root.find("Items")
+    if items_el is None:
+        return {}
+    id_text = {it.get("id", ""): (it.text or "") for it in items_el.findall("Item")}
+    item_sets = items_el.findall("ItemSet")
+
+    target = None
+    if stage_idx is not None:
+        target = next((s for s in item_sets if stage_idx in _extract_stage_indices(s.get("title", ""))), None)
+    if target is None:
+        active = items_el.get("activeItemSet")
+        target = next((s for s in item_sets if s.get("id") == active), None) or (item_sets[0] if item_sets else None)
+
+    slot_sockets = {}
+    if target is not None:
+        for slot in target.findall("Slot"):
+            iid = slot.get("itemId", "")
+            if iid and iid != "0" and iid in id_text:
+                layout = _sockets_line(id_text[iid])
+                if layout:
+                    slot_sockets[slot.get("name", "")] = layout
+    return slot_sockets
+
+
 def parse_pob_skill_groups(code_or_url: str, skill_set: str = "") -> str:
     """Extract the structured socket/link groups from a PoB build, per skill set.
 
@@ -688,11 +725,14 @@ def parse_pob_skill_groups(code_or_url: str, skill_set: str = "") -> str:
     substring, e.g. "Early Covenant"), otherwise the active set is returned. The
     top-level `skill_sets` index always lists every set so you can pick another.
 
-    Colours are intentionally NOT included — a gem's colour is static game data;
-    look it up per gem from its attribute requirements via pob-mcp's get_gem_detail
-    (read at a mid/high level; low levels omit the requirement). Note: item-granted
-    supports (e.g. The Hungry Loop) appear as gems and inflate gem_count even though
-    the item has only one real socket.
+    For slot-bound groups, `item_sockets` gives the item's ACTUAL socket-colour
+    layout (e.g. "G-B-B-B-R-B") read straight from the export — the author's real
+    colours. For unassigned groups (item-agnostic), and to compute the *required*
+    colours, derive each gem's natural colour from its attribute requirements via
+    pob-mcp's get_gem_detail (read at a mid/high level; low levels omit the
+    requirement). Note: item-granted supports (e.g. The Hungry Loop) appear as gems
+    and inflate gem_count even though the item has only one real socket; and abyssal
+    jewels are NOT here (they're items in abyssal sockets, with no R/G/B colour).
 
     Args:
         code_or_url: PoB export code, pobb.in / poedb.tw / pastebin URL.
@@ -721,6 +761,7 @@ def parse_pob_skill_groups(code_or_url: str, skill_set: str = "") -> str:
     sets = skills_el.findall("SkillSet")
     active_id = skills_el.get("activeSkillSet", "1")
 
+    stage_idx = None
     if not sets:
         # Older single-set format: <Skill> directly under <Skills>.
         index = [{"id": "1", "title": "(default)", "active": True}]
@@ -744,6 +785,16 @@ def parse_pob_skill_groups(code_or_url: str, skill_set: str = "") -> str:
         if target is None:
             target = next((s for s in sets if s.get("id") == active_id), sets[0])
         showing, groups = _clean_title(target.get("title", "")), _skill_groups_for_set(target)
+        idxs = _extract_stage_indices(target.get("title", ""))
+        stage_idx = idxs[0] if idxs else None
+
+    # Attach the item's ACTUAL socket colours (stored in the export) to slot-bound
+    # groups, matched to the stage's item set. Unassigned groups have no item, so no
+    # item_sockets — derive their required colours from the gems (via get_gem_detail).
+    slot_sockets = _itemset_slot_sockets(root, stage_idx)
+    for g in groups:
+        if g["slot"] and g["slot"] in slot_sockets:
+            g["item_sockets"] = slot_sockets[g["slot"]]
 
     return json.dumps({
         "class": build.get("class"),
