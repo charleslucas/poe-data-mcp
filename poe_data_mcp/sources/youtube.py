@@ -30,6 +30,39 @@ _YTDLP_MISSING = (
     "Alternatively, paste the video description/transcript text directly."
 )
 
+# Player-client selection. yt-dlp hanging on YouTube is almost always the default
+# *web* client stalling on YouTube's PO-token / nsig JS challenge. Keep yt-dlp's own
+# `default` rotation first, then guarantee the lightweight android_vr / tv clients
+# (which skip that challenge) are available as fallbacks. Unknown clients are skipped
+# non-fatally by yt-dlp, so this stays safe across version bumps.
+_YT_EXTRACTOR_ARGS = ["--extractor-args", "youtube:player_client=default,android_vr,tv"]
+
+
+def _tail(text: str | None, n: int = 12) -> str:
+    """Last ``n`` non-blank lines of some captured output, for diagnostics."""
+    lines = [ln for ln in (text or "").splitlines() if ln.strip()]
+    return "\n".join(lines[-n:])
+
+
+def _timeout_message(kind: str, url: str, exc: subprocess.TimeoutExpired) -> str:
+    """Turn an opaque timeout into a diagnosable one by surfacing yt-dlp's partial
+    output. ``TimeoutExpired`` carries whatever was captured before the process was
+    killed; showing the tail reveals which stage stalled (webpage / player API /
+    timedtext download). The attributes may be bytes or None depending on progress.
+    """
+    def _decode(b: object) -> str:
+        if b is None:
+            return ""
+        return b.decode("utf-8", "replace") if isinstance(b, bytes) else str(b)
+
+    partial = _tail(_decode(exc.stderr) or _decode(exc.stdout))
+    detail = f"\nLast yt-dlp output before the stall:\n{partial}" if partial else ""
+    return (
+        f"Timed out fetching YouTube {kind} for: {url}\n"
+        "yt-dlp stalled (usually a transient YouTube-side stall, not a missing "
+        "transcript). Try again in a moment." + detail
+    )
+
 # Links worth extracting from a build guide description
 _LINK_PATTERNS = {
     "pobb.in": re.compile(r"https?://pobb\.in/\S+"),
@@ -57,15 +90,17 @@ def fetch_youtube_description(url: str) -> str:
 
     try:
         title_result = subprocess.run(
-            [*ytdlp, "--get-title", "--force-ipv4", "--socket-timeout", "20", "--no-warnings", url],
+            [*ytdlp, "--get-title", "--force-ipv4", "--socket-timeout", "20",
+             "--no-warnings", *_YT_EXTRACTOR_ARGS, url],
             capture_output=True, text=True, timeout=30
         )
         desc_result = subprocess.run(
-            [*ytdlp, "--get-description", "--force-ipv4", "--socket-timeout", "20", "--no-warnings", url],
+            [*ytdlp, "--get-description", "--force-ipv4", "--socket-timeout", "20",
+             "--no-warnings", *_YT_EXTRACTOR_ARGS, url],
             capture_output=True, text=True, timeout=30
         )
-    except subprocess.TimeoutExpired:
-        return f"Timed out fetching YouTube description for: {url}"
+    except subprocess.TimeoutExpired as e:
+        return _timeout_message("description", url, e)
     except Exception as e:
         return f"Failed to run yt-dlp: {e}"
 
@@ -123,11 +158,13 @@ def fetch_youtube_transcript(url: str, include_timestamps: bool = False) -> str:
     # Get title and chapter list from description first (lightweight)
     try:
         title_result = subprocess.run(
-            [*ytdlp, "--get-title", "--force-ipv4", "--socket-timeout", "20", "--no-warnings", url],
+            [*ytdlp, "--get-title", "--force-ipv4", "--socket-timeout", "20",
+             "--no-warnings", *_YT_EXTRACTOR_ARGS, url],
             capture_output=True, text=True, timeout=15
         )
         desc_result = subprocess.run(
-            [*ytdlp, "--get-description", "--force-ipv4", "--socket-timeout", "20", "--no-warnings", url],
+            [*ytdlp, "--get-description", "--force-ipv4", "--socket-timeout", "20",
+             "--no-warnings", *_YT_EXTRACTOR_ARGS, url],
             capture_output=True, text=True, timeout=15
         )
         title = title_result.stdout.strip()
@@ -151,15 +188,11 @@ def fetch_youtube_transcript(url: str, include_timestamps: bool = False) -> str:
                 [*ytdlp, "--write-auto-subs", "--sub-lang", "en",
                  "--sub-format", "json3", "--skip-download", "--no-warnings",
                  "--force-ipv4", "--socket-timeout", "20", "--retries", "3",
-                 "-o", out_path, url],
+                 *_YT_EXTRACTOR_ARGS, "-o", out_path, url],
                 capture_output=True, text=True, timeout=120
             )
-        except subprocess.TimeoutExpired:
-            return (
-                f"Timed out fetching YouTube transcript for: {url}\n"
-                "yt-dlp stalled on the subtitle download (usually a transient "
-                "stalled connection, not a missing transcript). Try again."
-            )
+        except subprocess.TimeoutExpired as e:
+            return _timeout_message("transcript", url, e)
         if result.returncode != 0:
             err = result.stderr.strip()
             return f"yt-dlp failed to fetch transcript: {err or 'unknown error'}"
