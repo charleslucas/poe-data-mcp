@@ -10,6 +10,7 @@ Uses two poe.ninja API endpoints:
 """
 
 import html
+import os
 import re
 import time
 
@@ -112,6 +113,12 @@ def _get_current_league() -> str:
     event league) -- do not silently guess which one the caller means.
     """
     global _league_cache, _league_cache_ts, _league_ambiguous_cache, _league_ambiguous_cache_ts
+
+    # Explicit league wins over scraping poe.ninja's homepage (see AGENTS.md:
+    # pass POE_LEAGUE explicitly when several leagues run concurrently).
+    env_league = os.environ.get("POE_LEAGUE")
+    if env_league:
+        return env_league
 
     if _league_cache and (time.time() - _league_cache_ts) < _LEAGUE_TTL:
         return _league_cache
