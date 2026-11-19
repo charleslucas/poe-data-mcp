@@ -418,15 +418,65 @@ def search_craft_mods(query: str, item_class: str = "") -> str:
     if len(matches) > 100:
         lines.append(f"\n*Showing first 100 of {len(matches)}. Narrow with a more specific query.*")
 
+    lines.append(f"\nSource: {_COE_URL}")
     return "\n".join(lines)
 
 
-def get_craft_tiers(base_type: str, query: str) -> str:
+_COE_URL = "https://www.craftofexile.com/"
+
+
+def _is_base_mod(info: dict) -> bool:
+    """True when a modifier belongs to the base group (id_mgroup 1) or has no group info."""
+    g = info.get("id_mgroup")
+    return g is None or str(g) == "1"
+
+
+def affix_total_weight(
+    tiers_data: dict, mod_detail: dict, base_id: str, affix: str, ilvl: int
+) -> int:
+    """Sum the spawn weights of all rollable base-group tiers of one affix kind on a base.
+
+    Counts only base-group modifiers (id_mgroup 1; influence, fossil, essence etc. are
+    excluded) with non-zero weight whose min item level is <= ``ilvl``.
+    """
+    total = 0
+    for mod_id, tier_by_base in tiers_data.items():
+        info = mod_detail.get(str(mod_id), {})
+        if info.get("affix") != affix or not _is_base_mod(info):
+            continue
+        for t in tier_by_base.get(base_id, []):
+            try:
+                w = int(t.get("weighting", 0) or 0)
+                if w and int(t.get("ilvl", 0) or 0) <= ilvl:
+                    total += w
+            except (TypeError, ValueError):
+                continue
+    return total
+
+
+def format_share(weight, tier_ilvl, ilvl: int, total: int, affix: str, base_mod: bool) -> str:
+    """Share cell text: only prefix/suffix base-group tiers eligible at ilvl get a percentage."""
+    if affix not in ("prefix", "suffix") or not base_mod:
+        return "—"
+    try:
+        if total and int(tier_ilvl) <= ilvl:
+            return f"{int(weight) / total:.2%}"
+    except (TypeError, ValueError):
+        pass
+    return "—"
+
+
+def get_craft_tiers(base_type: str, query: str, ilvl: int = 100) -> str:
     """Show tier value ranges and spawn weights for a craftable mod on a specific item class.
 
     Looks up mods matching the keyword query and returns every tier's minimum item level,
     value range, and spawn weight — the raw numbers behind crafting probability. Tiers are
     shown highest-first (T1 = best values, lowest weight / hardest to roll).
+
+    The Share column is the chance this tier is picked among all mods of the same affix
+    kind (prefix or suffix) among base-group mods on this item class at item level `ilvl`;
+    it ignores influence, fossil and essence modifiers. Non-base mods and
+    non-prefix/suffix rows (corrupted, eldritch implicits) show a dash.
 
     Only tiers with non-zero weight are shown; zero-weight entries are unrollable
     (removed or debug mods) and are silently excluded.
@@ -435,9 +485,13 @@ def get_craft_tiers(base_type: str, query: str) -> str:
         base_type: Item class to look up tiers for. Partial, case-insensitive match.
                    Examples: 'staff', 'ring', 'helmet', 'bow', 'glove'.
                    Use 'warstaff' for warstaves. Matches against the class name,
-                   not individual base item names.
+                   not individual base item names. Base item names (e.g. 'Vaal Axe') are
+                   not accepted — call get_craft_base_items first to find the item class
+                   (e.g. 'two hand axe').
         query: Keyword to search mod text for. Examples: 'increased physical damage',
                'maximum life', 'attack speed', 'critical strike multiplier'.
+        ilvl: Item level used for the Share denominator (only tiers with min iLvl <= this
+              count). Default 100.
     """
     err = _require_cache()
     if err:
@@ -507,6 +561,7 @@ def get_craft_tiers(base_type: str, query: str) -> str:
         )
 
     lines = [f"## Craft of Exile — '{query}' tiers on {base_type}", ""]
+    totals: dict[tuple, int] = {}
 
     for display, mod_id, bid, base_name, affix, modgroup, tier_entries in results:
         lines.append(f"### {display}")
@@ -514,12 +569,17 @@ def get_craft_tiers(base_type: str, query: str) -> str:
             f"ID: {mod_id} | {affix} | group: {modgroup} | item class: {base_name} (id {bid})"
         )
         lines.append("")
-        lines.append("| Tier | Min iLvl | Values | Weight |")
-        lines.append("|------|----------|--------|--------|")
+        lines.append("| Tier | Min iLvl | Values | Weight | Share |")
+        lines.append("|------|----------|--------|--------|-------|")
 
+        key = (bid, affix)
+        if key not in totals:
+            totals[key] = affix_total_weight(tiers_data, mod_detail, bid, affix, ilvl)
+        total = totals[key]
+        base_mod = _is_base_mod(mod_detail.get(str(mod_id), {}))
         sorted_tiers = sorted(tier_entries, key=lambda t: int(t.get("ilvl", 0)), reverse=True)
         for i, t in enumerate(sorted_tiers):
-            ilvl = t.get("ilvl", "?")
+            tier_ilvl = t.get("ilvl", "?")
             raw_nv = t.get("nvalues", "?")
             weight = t.get("weighting", "?")
             try:
@@ -533,10 +593,12 @@ def get_craft_tiers(base_type: str, query: str) -> str:
                 formatted = ", ".join(parts)
             except Exception:
                 formatted = raw_nv
-            lines.append(f"| T{i + 1} | {ilvl} | {formatted} | {weight} |")
+            share = format_share(weight, tier_ilvl, ilvl, total, affix, base_mod)
+            lines.append(f"| T{i + 1} | {tier_ilvl} | {formatted} | {weight} | {share} |")
 
         lines.append("")
 
+    lines.append(f"\nSource: {_COE_URL}")
     return "\n".join(lines)
 
 
@@ -610,6 +672,7 @@ def get_fossil_info(fossil_name: str) -> str:
 
         lines.append("")
 
+    lines.append(f"\nSource: {_COE_URL}")
     return "\n".join(lines)
 
 
@@ -677,6 +740,7 @@ def get_essence_mods(essence_name: str, item_type: str = "") -> str:
             lines.append(f"| {slot} | {val} |")
         lines.append("")
 
+    lines.append(f"\nSource: {_COE_URL}")
     return "\n".join(lines)
 
 
@@ -736,4 +800,5 @@ def get_craft_base_items(query: str = "", item_class: str = "") -> str:
     if len(matches) > 200:
         lines.append(f"\n*Showing first 200 of {len(matches)}. Use a more specific query.*")
 
+    lines.append(f"\nSource: {_COE_URL}")
     return "\n".join(lines)
